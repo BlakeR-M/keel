@@ -1,0 +1,18 @@
+# Fixture corpus manifest. `keel ingest --manifest fixtures/corpus.yaml` ingests each file with its ACL tags.
+# Tags: a user must carry at least one of a document's tags to retrieve from it.
+documents:
+  - path: fixtures/corpus/northbank-council-procurement.md
+    title: Northbank City Council Procurement Guide
+    acl_tags: [public]
+  - path: fixtures/corpus/harbour-clinic-data-handling.md
+    title: Harbour Clinic Data Handling Standard
+    acl_tags: [public]
+  - path: fixtures/corpus/keel-operations.md
+    title: Keel Operations Notes
+    acl_tags: [public]
+  - path: fixtures/corpus/hr-salary-bands.md
+    title: Northbank Salary Bands
+    acl_tags: [hr]
+  - path: fixtures/corpus/supplier-note-injected.md
+    title: Supplier Note Bright Office Supplies
+    acl_tags: [public]

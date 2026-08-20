@@ -1,0 +1,4 @@
+# Put the GGUF the compose stack should serve here as model.gguf (or set KEEL_MODELS_DIR / KEEL_MODEL_FILE).
+# Model files stay out of git.
+*
+!.gitignore

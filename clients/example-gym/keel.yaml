@@ -1,0 +1,67 @@
+# Keel overlay: Example Gym (gym).
+#
+# Config only. No document, member record, waiver, roster or contact detail belongs in this file or
+# anywhere in this repository. Real paths and people are filled in on the client's machine (see runbook.md).
+#
+# Layout is shared with clients/example-agency/keel.yaml so a third client is a copy: client, settings,
+# roles, users, files, notes.
+
+client:
+  id: example-gym
+  name: Example Gym
+  kind: gym
+  location: Canberra
+  approver_role: owner        # who decides approval-queue items and reads the admin page
+
+# Each key maps to the KEEL_ environment variable of the same name in upper case (KEEL_PROFILE,
+# KEEL_DATA_DIR, ...). The runbook sets them before deploy/onprem/run.ps1 starts the stack.
+settings:
+  profile: local
+  data_dir: C:\Keel\example-gym\data
+  airgap: 1
+  local_llm_base_url: http://127.0.0.1:8081/v1
+  local_llm_model: qwen2.5-3b-instruct
+  local_embed_model: BAAI/bge-small-en-v1.5
+  local_rerank_model: Xenova/ms-marco-MiniLM-L-6-v2
+  rerank: true
+  min_relevance: 0.15
+  host: 127.0.0.1
+  port: 8400
+
+# ACL tags in this overlay:
+#   public      material members may also see (membership terms, class schedule, gym rules)
+#   staff       every staff member: staff procedures, emergency plan, code of conduct
+#   front-desk  opening and closing, point of sale, refunds, waiver handling
+#   trainer     programming guides, class run sheets, equipment checks
+#   owner       supplier contracts, insurance, finance, management notes
+# A role carries every tag listed for it; a chunk is readable when the user holds one of the chunk's tags.
+roles:
+  owner: [public, staff, front-desk, trainer, owner]
+  front-desk: [public, staff, front-desk]
+  trainer: [public, staff, trainer]
+
+# Pilot users. Ids are placeholders by design; the runbook explains how to replace them with the
+# client's own ids on their machine. Roles are the part that matters.
+users:
+  - user_id: owner
+    role: owner
+  - user_id: front-desk-1
+    role: front-desk
+  - user_id: front-desk-2
+    role: front-desk
+  - user_id: trainer-1
+    role: trainer
+  - user_id: trainer-2
+    role: trainer
+
+# Sibling files, relative to this directory.
+files:
+  policy: policy.yaml                  # copied to <data_dir>/policy.yaml at install
+  manifest: corpus.manifest.yaml       # template; filled in on the client's machine
+  runbook: runbook.md
+  checklist: needs-from-client.md
+
+notes:
+  - The pilot runs air-gapped on the front-desk machine; nothing leaves the box.
+  - Signed waivers carry member details and stay out of the corpus; the blank waiver and the handling procedure are tagged front-desk.
+  - Write tools (create_ticket) wait in the approval queue for the owner.

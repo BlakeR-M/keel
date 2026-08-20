@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Keel · Request {{ row.request_id[:8] }}{% endblock %}
+{% block content %}
+<section class="intro">
+  <p class="crumbs"><a href="/admin">Admin</a> · request</p>
+  <h1>{{ row.question }}</h1>
+  <p class="lede">
+    <span class="tag mode">{{ row.mode }}</span>
+    <span class="tag">{{ row.user_id }} · {{ (row.user_tags or [])|join(', ') }}</span>
+    {% if row.refused %}<span class="tag state-refused">refusal</span>{% endif %}
+    <span class="tag mono">{{ row.request_id }}</span>
+  </p>
+</section>
+
+<dl class="meta">
+  <dt>Time</dt><dd>{{ row.ts|clock }} UTC</dd>
+  <dt>Latency</dt><dd>{{ row.latency_ms|thousands }} ms</dd>
+  <dt>Tokens</dt><dd>{{ row.prompt_tokens|thousands }} prompt · {{ row.output_tokens|thousands }} output</dd>
+  <dt>Provider</dt><dd>{{ row.provider or '' }}{% if row.model %} · {{ row.model }}{% endif %}</dd>
+</dl>
+
+<section class="block">
+  <h2>Answer</h2>
+  <div class="answer-text boxed">{{ row.answer or '' }}</div>
+</section>
+
+<section class="block">
+  <h2>Retrieved chunks</h2>
+  {% if retrieved %}
+  <ul class="chips">
+    {% for item in retrieved %}<li><a class="chip" href="{{ item.url }}">chunk {{ item.chunk_id }}</a></li>{% endfor %}
+  </ul>
+  {% else %}
+  <p class="hint">{% if row.mode == 'agent' %}Agent runs retrieve through the search_docs tool; see the tool calls below.{% else %}Retrieval came back empty for this user and question.{% endif %}</p>
+  {% endif %}
+</section>
+
+<section class="block">
+  <h2>Citations</h2>
+  {% if citations %}
+  <ol class="cite-list">
+    {% for c in citations %}
+    <li>
+      <a class="chip" href="{{ c.url or '#' }}"><span class="n">[{{ c.n }}]</span> {{ c.title or c.source }}{% if c.heading %} · {{ c.heading }}{% endif %}{% if c.page %} · p.{{ c.page }}{% endif %}</a>
+      <p class="snippet">{{ c.snippet }}</p>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <p class="hint">Citations appear here when the answer cites a source.</p>
+  {% endif %}
+</section>
+
+<section class="block">
+  <h2>Tool calls</h2>
+  {% if steps %}
+  <ol class="steps">
+    {% for step in steps %}
+    <li class="step step-{{ step.state }}">
+      <div class="step-line">
+        <span class="tool">{{ step.tool }}</span>
+        <code class="args">{{ step.arguments|pretty|short(200) }}</code>
+        <span class="tag state-{{ step.state }}">{{ step.state }}</span>
+      </div>
+      <pre class="step-out">{{ step.outcome|short(2000) }}</pre>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <p class="hint">Tool calls appear here when a request runs in agent mode and the model uses a tool.</p>
+  {% endif %}
+  {% if approvals %}
+  <h3>Approvals from this request</h3>
+  <ul class="plain">
+    {% for a in approvals %}<li>#{{ a.id }} <span class="tool">{{ a.tool }}</span> · <span class="tag state-{{ a.status }}">{{ a.status }}</span>{% if a.result %} · {{ a.result|short(160) }}{% endif %}</li>{% endfor %}
+  </ul>
+  {% endif %}
+</section>
+
+<section class="block">
+  <h2>Judge scores</h2>
+  {% if row.judge %}
+  <pre class="boxed">{{ row.judge|pretty }}</pre>
+  {% else %}
+  <p class="hint">Scores appear here once an eval run judges this request.</p>
+  {% endif %}
+</section>
+
+<section class="block">
+  <h2>Ledger rows</h2>
+  {% if ledger %}
+  <details open>
+    <summary>{{ ledger|length }} rows for this request</summary>
+    <div class="table-wrap">
+    <table class="grid">
+      <thead><tr><th>Seq</th><th>Time</th><th>Kind</th><th>Payload</th></tr></thead>
+      <tbody>
+      {% for entry in ledger %}
+        <tr>
+          <td class="mono">{{ entry.seq }}</td>
+          <td class="mono">{{ entry.ts|clock }}</td>
+          <td>{{ entry.kind }}</td>
+          <td><pre class="args-cell">{{ entry.payload|pretty|short(600) }}</pre></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
+  {% else %}
+  <p class="hint">Ledger rows appear here once the ledger holds entries for this request id.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "keel"
+version = "0.1.0"
+description = "Sovereign RAG and agent appliance. One codebase, on-premise or Azure, with evaluation, policy and audit built in."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Apache-2.0"}
+authors = [{name = "Blake Rowlands-Mowle"}]
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "pydantic>=2.6",
+  "pydantic-settings>=2.2",
+  "typer>=0.12",
+  "rank-bm25>=0.2.2",
+  "fastembed>=0.3",
+  "numpy>=1.26",
+  "pypdf>=4.0",
+  "python-docx>=1.1",
+  "beautifulsoup4>=4.12",
+  "lxml>=5.0",
+  "markdown>=3.5",
+  "pyyaml>=6.0",
+  "httpx>=0.27",
+  "openai>=1.30",
+  "jinja2>=3.1",
+  "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+azure = ["azure-identity>=1.16", "azure-search-documents>=11.4"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.4"]
+
+[project.scripts]
+keel = "keel.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["keel*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "redteam_*.py"]
+markers = [
+  "integration: needs a running llama-server or network",
+]
+addopts = "-q"

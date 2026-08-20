@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Keel · Source {{ chunk.chunk_id }}{% endblock %}
+{% block content %}
+<section class="intro">
+  <p class="crumbs"><a href="/">Chat</a> · source</p>
+  <h1>{{ chunk.title or chunk.source }}</h1>
+  <p class="lede">
+    <span class="tag">chunk {{ chunk.chunk_id }}</span>
+    <span class="tag">document {{ chunk.document_id }}</span>
+    <span class="tag">position {{ chunk.ordinal }}</span>
+    {% if chunk.page %}<span class="tag">page {{ chunk.page }}</span>{% endif %}
+    {% for tag in chunk.acl_tags %}<span class="tag acl">{{ tag }}</span>{% endfor %}
+    {% if chunk.quarantined %}<span class="tag state-refused">quarantined</span>{% endif %}
+  </p>
+</section>
+
+<dl class="meta">
+  <dt>Source</dt><dd><code>{{ chunk.source }}</code></dd>
+  {% if chunk.heading %}<dt>Heading</dt><dd>{{ chunk.heading }}</dd>{% endif %}
+  <dt>Viewed as</dt><dd>{{ user.user_id }} · {{ user.tags|join(', ') }}</dd>
+  {% if chunk.quarantined %}
+  <dt>Quarantine</dt><dd>{{ chunk.quarantine_reason or 'flagged by the injection screen' }}. Retrieval leaves this chunk out until an admin releases it on the <a href="/admin#quarantine">admin page</a>.</dd>
+  {% elif chunk.quarantine_reason %}
+  <dt>History</dt><dd>Once quarantined ({{ chunk.quarantine_reason }}), released by an admin. See the ledger.</dd>
+  {% endif %}
+</dl>
+
+<article class="chunk-text" aria-label="Chunk text">
+<pre>{{ chunk.text }}</pre>
+</article>
+{% endblock %}

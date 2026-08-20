@@ -1,0 +1,70 @@
+# Keel on-premise stack: llama.cpp server + Keel app + one named data volume.
+#
+#   docker compose -f deploy/onprem/docker-compose.yml up -d --build
+#   docker compose -f deploy/onprem/docker-compose.yml exec keel keel ingest --manifest fixtures/corpus.yaml
+#   open http://127.0.0.1:8400
+#
+# Model file: put a GGUF at ./models/model.gguf next to this file (or set KEEL_MODELS_DIR and KEEL_MODEL_FILE).
+#
+# Image tags to pin before production use (the floating tags below track upstream main):
+#   ghcr.io/ggml-org/llama.cpp:server-b<build>        CPU build, e.g. server-b5000
+#   ghcr.io/ggml-org/llama.cpp:server-cuda-b<build>   CUDA build for the GPU override (docker-compose.gpu.yml)
+#   python:3.11.<patch>-slim                           base image in the root Dockerfile
+# Read the build number from https://github.com/ggml-org/llama.cpp/releases and pin the digest with
+# `docker buildx imagetools inspect <image:tag>` once the stack is verified.
+#
+# Air-gap: the keel service runs with KEEL_AIRGAP=1. Inside the container every outbound connection
+# other than loopback and the `llama` service is refused before a packet leaves. See docs/onprem.md
+# for the network-level proof (`docker run --network none`) and the GPU override.
+
+name: keel
+
+services:
+  llama:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    restart: unless-stopped
+    volumes:
+      - ${KEEL_MODELS_DIR:-./models}:/models:ro
+    command: >
+      -m /models/${KEEL_MODEL_FILE:-model.gguf}
+      --host 0.0.0.0 --port 8081 --jinja
+      --alias ${KEEL_LLAMA_ALIAS:-qwen2.5-3b-instruct}
+      -c ${KEEL_LLAMA_CTX:-8192} -ngl ${KEEL_NGL:-0}
+    healthcheck:
+      # The image's built-in check targets port 8080; the command above listens on 8081.
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    expose:
+      - "8081"
+
+  keel:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      llama:
+        condition: service_healthy
+    environment:
+      KEEL_PROFILE: local
+      KEEL_DATA_DIR: /app/data
+      KEEL_LOCAL_LLM_BASE_URL: http://llama:8081/v1
+      KEEL_LOCAL_LLM_MODEL: qwen2.5-3b-instruct
+      KEEL_AIRGAP: "1"
+      KEEL_AIRGAP_ALLOW_HOSTS: llama
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      HF_HUB_DISABLE_SYMLINKS_WARNING: "1"
+    ports:
+      - "${KEEL_BIND:-127.0.0.1}:8400:8400"
+    volumes:
+      - keel-data:/app/data
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  keel-data:
+    name: keel-data

@@ -1,0 +1,22 @@
+# GPU override: run llama-server on an NVIDIA card with every layer offloaded.
+#
+#   docker compose -f deploy/onprem/docker-compose.yml -f deploy/onprem/docker-compose.gpu.yml up -d --build
+#
+# Needs the NVIDIA Container Toolkit on the host. Pin ghcr.io/ggml-org/llama.cpp:server-cuda-b<build>
+# to match the CPU tag chosen in docker-compose.yml.
+
+services:
+  llama:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    command: >
+      -m /models/${KEEL_MODEL_FILE:-model.gguf}
+      --host 0.0.0.0 --port 8081 --jinja
+      --alias ${KEEL_LLAMA_ALIAS:-qwen2.5-3b-instruct}
+      -c ${KEEL_LLAMA_CTX:-8192} -ngl ${KEEL_NGL:-99}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

@@ -1,0 +1,21 @@
+# Keep the image to the code it needs. Data, models, caches and reports live outside the build context.
+.venv
+data
+.git
+__pycache__
+*.pyc
+*.db
+*.db-wal
+*.db-shm
+deploy/onprem/models
+reports
+demo-corpus
+.pytest_cache
+.ruff_cache
+.env
+.env.*
+!.env.example
+logs
+dist
+build
+*.egg-info

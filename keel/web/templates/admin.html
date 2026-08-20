@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Keel · Admin{% endblock %}
+{% macro number(value, unit) -%}
+  {%- if value is none -%}·{%- elif value == value|int -%}{{ value|int|thousands }}{{ unit }}{%- else -%}{{ value|round(3) }}{{ unit }}{%- endif -%}
+{%- endmacro %}
+{% block content %}
+<section class="intro">
+  <h1>Admin</h1>
+  <p class="lede">What the appliance has done and what waits on a person. Every row here comes from the inference log, the approval queue and the ledger in the SQLite store.</p>
+  <ul class="facts" aria-label="Appliance settings">
+    <li><span class="k">profile</span><span class="v">{{ settings.profile }}</span></li>
+    <li><span class="k">model</span><span class="v">{{ settings.llm_model }}</span></li>
+    <li><span class="k">listening on</span><span class="v">{{ settings.host }}:{{ settings.port }}</span></li>
+    <li><span class="k">admin access</span><span class="v">{% if settings.guarded %}token required{% else %}open on loopback{% endif %}</span></li>
+    <li><span class="k">air-gap</span><span class="v">{% if settings.airgap %}on{% else %}off{% endif %}</span></li>
+    <li><span class="k">refusal below</span><span class="v">{{ settings.min_relevance }}</span></li>
+  </ul>
+  {% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
+</section>
+
+<section id="totals" class="tiles" aria-label="Totals">
+  <div class="tile"><span class="num">{{ totals.requests|thousands }}</span><span class="cap">requests</span></div>
+  <div class="tile"><span class="num">{{ totals.refused|thousands }}</span><span class="cap">refusals · {{ totals.refused|percent(totals.requests) }}</span></div>
+  <div class="tile"><span class="num">{{ totals.avg_latency_ms|thousands }}</span><span class="cap">average latency, ms</span></div>
+  <div class="tile"><span class="num">{{ totals.prompt_tokens|thousands }}</span><span class="cap">prompt tokens</span></div>
+  <div class="tile"><span class="num">{{ totals.output_tokens|thousands }}</span><span class="cap">output tokens</span></div>
+  <div class="tile"><span class="num">{{ counts.documents|thousands }}</span><span class="cap">documents</span></div>
+  <div class="tile"><span class="num">{{ counts.chunks|thousands }}</span><span class="cap">chunks</span></div>
+  <div class="tile"><span class="num">{{ counts.quarantined|thousands }}</span><span class="cap">quarantined</span></div>
+  <div class="tile"><span class="num">{{ counts.pending_approvals|thousands }}</span><span class="cap">pending approvals</span></div>
+  <div class="tile"><span class="num">{{ counts.ledger_seq|thousands }}</span><span class="cap">ledger rows</span></div>
+</section>
+
+<section id="trend" class="block">
+  <h2>Last {{ trend_days }} days</h2>
+  <div class="sparks">
+    {% for s in sparklines %}
+    <figure class="spark{% if not s.present %} empty{% endif %}">
+      <figcaption>
+        <span class="spark-label">{{ s.label }}</span>
+        <span class="spark-vals">
+          <span class="spark-last" title="Latest value">{{ s.last_text }}</span>
+          {% if s.present %}<span class="spark-peak">peak {{ number(s.peak, s.unit) }}</span>{% endif %}
+        </span>
+      </figcaption>
+      <svg viewBox="0 0 240 48" width="240" height="48" role="img" aria-label="{{ s.label }}, last {{ trend_days }} days{% if s.present %}, latest {{ s.last_text }}, peak {{ number(s.peak, s.unit) }}{% endif %}">
+        <line x1="4" y1="44" x2="236" y2="44" class="axis"/>
+        {% if s.points %}
+        <polyline points="{{ s.points }}" class="line"/>
+        {% for x, y in s.dots %}<circle cx="{{ x }}" cy="{{ y }}" r="1.6" class="dot"/>{% endfor %}
+        {% endif %}
+      </svg>
+      <div class="spark-axis" aria-hidden="true">
+        <span>{{ trend_days }} days ago</span>
+        <span>today</span>
+      </div>
+      {% if not s.present %}<p class="spark-empty">{% if s.key in ('groundedness', 'relevance') %}appears once an eval run attaches judge scores{% else %}appears with the first request{% endif %}</p>{% endif %}
+    </figure>
+    {% endfor %}
+  </div>
+</section>
+
+<section id="recent" class="block">
+  <h2>Recent requests</h2>
+  {% if recent %}
+  <div class="table-wrap">
+  <table class="grid">
+    <thead><tr><th>Time</th><th>Mode</th><th>User</th><th>Question</th><th>Refused</th><th>Latency</th><th>Tokens</th></tr></thead>
+    <tbody>
+    {% for row in recent %}
+      <tr>
+        <td class="mono"><a href="/admin/request/{{ row.request_id }}">{{ row.ts|clock }}</a></td>
+        <td><span class="tag mode">{{ row.mode }}</span></td>
+        <td>{{ row.user_id }}</td>
+        <td class="q"><a href="/admin/request/{{ row.request_id }}" title="{{ row.question }}">{{ row.question|short(80) }}</a></td>
+        <td>{% if row.refused %}<span class="tag state-refused">yes</span>{% else %}<span class="muted">no</span>{% endif %}</td>
+        <td class="num-cell">{{ row.latency_ms|thousands }} ms</td>
+        <td class="num-cell">{{ ((row.prompt_tokens or 0) + (row.output_tokens or 0))|thousands }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="hint">The first question asked on the <a href="/">chat page</a> appears here.</p>
+  {% endif %}
+</section>
+
+<section id="approvals" class="block">
+  <h2>Approvals</h2>
+  {% if pending %}
+  <p class="hint">Write tool calls from agent mode wait here. Approve runs the call and records the result; reject closes the ticket and the tool stays idle.</p>
+  <div class="table-wrap">
+  <table class="grid">
+    <thead><tr><th>#</th><th>Time</th><th>Tool</th><th>Arguments</th><th>Request</th><th>Decide</th></tr></thead>
+    <tbody>
+    {% for row in pending %}
+      <tr>
+        <td class="mono">{{ row.id }}</td>
+        <td class="mono">{{ row.ts|clock }}</td>
+        <td><span class="tool">{{ row.tool }}</span></td>
+        <td><pre class="args-cell">{{ row.arguments|pretty }}</pre></td>
+        <td class="mono"><a href="/admin/request/{{ row.request_id }}">{{ row.request_id[:8] }}</a></td>
+        <td class="actions">
+          <form method="post" action="/admin/approvals/{{ row.id }}/approve"><input type="hidden" name="by" value="admin"><button type="submit" class="primary small">Approve</button></form>
+          <form method="post" action="/admin/approvals/{{ row.id }}/reject"><input type="hidden" name="by" value="admin"><button type="submit" class="small">Reject</button></form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="hint">The queue is clear. Write tool calls from agent mode land here before they run.</p>
+  {% endif %}
+  {% if decided %}
+  <details class="decided">
+    <summary>Recent decisions ({{ decided|length }})</summary>
+    <div class="table-wrap">
+    <table class="grid">
+      <thead><tr><th>#</th><th>Tool</th><th>Status</th><th>By</th><th>Result</th></tr></thead>
+      <tbody>
+      {% for row in decided %}
+        <tr>
+          <td class="mono">{{ row.id }}</td>
+          <td><span class="tool">{{ row.tool }}</span></td>
+          <td><span class="tag state-{{ row.status }}">{{ row.status }}</span></td>
+          <td>{{ row.decided_by or '' }}</td>
+          <td class="q">{{ row.result|short(120) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
+  {% endif %}
+</section>
+
+<section id="quarantine" class="block">
+  <h2>Quarantine</h2>
+  {% if quarantine %}
+  <p class="hint">Chunks the injection screen flagged at ingest. Retrieval leaves them out. Release one when a person has read it and judges it safe; the release lands in the ledger.</p>
+  <div class="table-wrap">
+  <table class="grid">
+    <thead><tr><th>Chunk</th><th>Source</th><th>Reason</th><th>Decide</th></tr></thead>
+    <tbody>
+    {% for row in quarantine %}
+      <tr>
+        <td class="mono"><a href="{{ row.url }}">{{ row.chunk_id }}</a></td>
+        <td class="q"><span title="{{ row.source }}">{{ row.title or row.source }}</span>{% if row.heading %} <span class="muted">· {{ row.heading }}</span>{% endif %}</td>
+        <td class="q">{{ row.quarantine_reason or 'flagged by the injection screen' }}</td>
+        <td class="actions">
+          <form method="post" action="/admin/quarantine/{{ row.chunk_id }}/release"><input type="hidden" name="by" value="admin"><button type="submit" class="small">Release</button></form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="hint">Every chunk in the store is clear of quarantine.</p>
+  {% endif %}
+</section>
+
+<section id="ledger" class="block">
+  <h2>Ledger</h2>
+  <p class="hint">Hash-chained audit trail: every request, retrieval set, tool call, approval, ingest and quarantine change. Verify recomputes the chain in place; export hands you the JSONL an auditor checks offline with <code>keel.safety.ledger.verify_file</code> and plain Python.</p>
+  <div class="actions inline">
+    <form method="post" action="/admin/ledger/verify"><button type="submit" class="primary">Verify ledger</button></form>
+    <a class="button" href="/admin/ledger/export" download="keel-ledger.jsonl">Export JSONL</a>
+  </div>
+  {% if verify %}
+  <div class="verify {% if verify.ok %}ok{% else %}bad{% endif %}" role="status">
+    {% if verify.ok %}
+    <span class="tag state-ok">ok</span> Verified: {{ verify.checked|thousands }} rows, chain intact.
+    {% else %}
+    <span class="tag state-refused">broken</span> Verified {{ verify.checked|thousands }} rows; the chain breaks at seq {{ verify.first_bad_seq }}: {{ verify.reason }}
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

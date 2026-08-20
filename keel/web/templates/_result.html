@@ -1,0 +1,61 @@
+{# One answer or agent run. Rendered alone for fetch swaps and inside chat.html for plain form posts. Expects `r`. #}
+<article class="result{% if r.mode == 'answer' and r.answer.refused %} refused{% endif %}" data-request-id="{{ r.request_id }}">
+  <header class="result-head">
+    <span class="tag mode">{{ r.mode }}</span>
+    <span class="tag">{{ r.user.user_id }} · {{ r.user.tags|join(', ') }}</span>
+    {% if r.mode == 'answer' and r.answer.refused %}<span class="tag state-refused">refusal</span>{% endif %}
+    {% if r.mode == 'answer' and r.answer.error %}<span class="tag state-refused">invalid JSON</span>{% endif %}
+  </header>
+  <p class="asked">{{ r.question }}</p>
+
+  {% if r.mode == 'answer' %}
+    <div class="answer-text">{{ r.html }}</div>
+    {% if r.answer.refused %}
+    <p class="refused-note">Keel answers from the documents this user may read, and this question sits outside them. Try another user or a question the corpus covers.</p>
+    {% endif %}
+    {% if r.chips %}
+    <div class="sources">
+      <span class="label">Sources</span>
+      <ul class="chips">
+        {% for chip in r.chips %}
+        <li><a class="chip" href="{{ chip.url }}" title="{{ chip.snippet }}"><span class="n">[{{ chip.n }}]</span> {{ chip.label }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  {% else %}
+    <div class="answer-text">{{ r.agent.text }}</div>
+    {% if r.steps %}
+    <div class="steps-block">
+      <span class="label">Steps</span>
+      <ol class="steps">
+        {% for step in r.steps %}
+        <li class="step step-{{ step.state }}">
+          <div class="step-line">
+            <span class="tool">{{ step.tool }}</span>
+            <code class="args">{{ step.arguments|pretty|short(160) }}</code>
+            <span class="tag state-{{ step.state }}">{{ step.state }}</span>
+          </div>
+          {% if step.state == 'queued' %}
+          <p class="step-out">{{ step.outcome }} · <a href="/admin#approvals">decide on the admin page</a></p>
+          {% elif step.state == 'refused' %}
+          <p class="step-out">{{ step.outcome }}</p>
+          {% else %}
+          <pre class="step-out">{{ step.outcome|short(1200) }}</pre>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
+    {% else %}
+    <p class="hint">The model answered directly; tool calls appear here when the agent uses one.</p>
+    {% endif %}
+  {% endif %}
+
+  <footer class="result-foot">
+    <span>{{ r.latency_ms|thousands }} ms</span>
+    <span>{{ r.prompt_tokens|thousands }} prompt tokens</span>
+    <span>{{ r.output_tokens|thousands }} output tokens</span>
+    <a href="/admin/request/{{ r.request_id }}" title="Open this request in the admin log">request {{ r.request_id[:8] }}</a>
+  </footer>
+</article>

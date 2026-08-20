@@ -1,0 +1,5 @@
+# Staging area for an offline image build: copy your fastembed cache here before `docker compose build`.
+# Windows: %TEMP%\fastembed_cache   Linux/macOS: /tmp/fastembed_cache   (or the FASTEMBED_CACHE_PATH you set)
+# The directory itself is tracked so the Dockerfile COPY always has a source; its contents stay out of git.
+*
+!.gitignore

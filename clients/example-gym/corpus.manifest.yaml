@@ -1,0 +1,94 @@
+# Ingest manifest TEMPLATE: Example Gym.
+#
+# This file holds placeholders. No client document lives in this repository. On the client's machine:
+#   1. Copy this file to C:\Keel\example-gym\corpus.manifest.yaml (next to a corpus\ folder).
+#   2. Put the documents under corpus\<class>\ and replace each example path with the real file name
+#      (one entry per file; a class with five files gets five entries with the same acl_tags).
+#   3. Remove entries you have no file for: ingest stops at the first missing path.
+#   4. .venv\Scripts\python.exe -m keel.cli ingest --manifest C:\Keel\example-gym\corpus.manifest.yaml
+# Relative paths resolve against this file's directory. Ingest is idempotent: rerunning adds nothing.
+#
+# acl_tags follow keel.yaml roles: a user must carry at least one of a document's tags to retrieve it.
+# Tag each document with the narrowest role that should read it; wider roles carry that tag too.
+# `class` is kept as document metadata for the admin page.
+
+documents:
+  # --- public: material members may also see -----------------------------------------------
+  - path: corpus/public/membership-terms.pdf
+    title: Membership Terms and Conditions
+    acl_tags: [public]
+    class: membership-terms
+
+  - path: corpus/public/class-schedule.pdf
+    title: Class Schedule
+    acl_tags: [public]
+    class: schedule
+
+  - path: corpus/public/gym-rules.md
+    title: Gym Rules and Etiquette
+    acl_tags: [public]
+    class: member-facing
+
+  # --- staff: every staff member -----------------------------------------------------------
+  - path: corpus/staff/staff-procedures.docx
+    title: Staff Procedures
+    acl_tags: [staff]
+    class: procedure
+
+  - path: corpus/staff/emergency-and-first-aid-plan.pdf
+    title: Emergency and First Aid Plan
+    acl_tags: [staff]
+    class: procedure
+
+  - path: corpus/staff/code-of-conduct.pdf
+    title: Staff Code of Conduct
+    acl_tags: [staff]
+    class: policy
+
+  # --- front-desk: desk procedures and waiver handling -----------------------------------------
+  - path: corpus/front-desk/opening-and-closing.md
+    title: Opening and Closing Procedure
+    acl_tags: [front-desk]
+    class: procedure
+
+  - path: corpus/front-desk/point-of-sale-and-refunds.docx
+    title: Point of Sale and Refunds
+    acl_tags: [front-desk]
+    class: procedure
+
+  - path: corpus/front-desk/waiver-form-template.pdf
+    title: Waiver Form (blank template)
+    acl_tags: [front-desk]
+    class: waiver-template
+
+  - path: corpus/front-desk/waiver-handling-procedure.md
+    title: Waiver Handling Procedure
+    acl_tags: [front-desk]
+    class: procedure
+
+  # --- trainer: programming and class delivery ------------------------------------------------
+  - path: corpus/trainers/programming-guide.pdf
+    title: Programming Guide
+    acl_tags: [trainer]
+    class: guide
+
+  - path: corpus/trainers/class-run-sheets.docx
+    title: Class Run Sheets
+    acl_tags: [trainer]
+    class: guide
+
+  - path: corpus/trainers/equipment-checks.md
+    title: Equipment Check Procedure
+    acl_tags: [trainer]
+    class: procedure
+
+  # --- owner: management ---------------------------------------------------------------------
+  - path: corpus/management/insurance-summary.pdf
+    title: Insurance Summary
+    acl_tags: [owner]
+    class: management
+
+  - path: corpus/management/supplier-contracts.docx
+    title: Supplier Contracts
+    acl_tags: [owner]
+    class: management

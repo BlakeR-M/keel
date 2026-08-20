@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Keel · Chat{% endblock %}
+{% block content %}
+<section class="intro">
+  <h1>Ask the documents</h1>
+  {% if demo %}
+  <dialog id="intro" aria-labelledby="intro-title">
+    <h2 id="intro-title">Keel</h2>
+    <p><strong>What it is.</strong> A retrieval and agent appliance that runs where the documents live: one machine on premise, or a client's own Azure tenancy. This demo is the on-premise build with a small CPU model.</p>
+    <p><strong>What it is for.</strong> A team asks questions of its own documents and gets answers citing the exact chunk they came from. The permission filter sits inside retrieval, so each person sees what their role allows and the model sees only entitled chunks.</p>
+    <p><strong>How it is built.</strong> Hybrid BM25 and vector retrieval, fused and reranked, with the permission filter applied before fusion. A local model generates, and every request lands in a hash-chained ledger the admin page can verify.</p>
+    <p><strong>How it runs internal operations.</strong> Agent mode calls typed tools under a written policy: document search, read-only SQL, a calculator, ticket creation. Write actions wait in an approval queue for a person, and every step is audited.</p>
+    <form method="dialog"><button class="primary">Into the demo</button></form>
+  </dialog>
+  <p class="banner" id="demo-banner">Hosted demo of the fixture corpus. Permission filtering is the demonstration: one question about a restricted document, asked as two users, side by side. <a href="#" id="intro-open">About this demo</a></p>
+  <div class="compare-launch">
+    <button type="button" id="demo-compare" class="primary" data-question="What is the confidential review code for the 2026 pay round?">Ask as both users</button>
+    <span class="compare-note">&ldquo;What is the confidential review code for the 2026 pay round?&rdquo; as <strong>public</strong> and as <strong>hr-officer</strong>.</span>
+  </div>
+  <section id="compare" aria-live="polite"></section>
+  {% endif %}
+  <p class="lede">Keel answers from the documents the selected user may read and cites each source. When the sources sit outside the question, it says so plainly. Agent mode lets the model call tools; write actions wait for a person on the <a href="/admin#approvals">admin page</a>.</p>
+  <p class="lede">Retrieval is hybrid BM25 and vector, fused and reranked, with the permission filter applied inside the retriever, before fusion.</p>
+</section>
+
+<form id="ask-form" method="post" action="/ask" class="ask">
+  <label class="field wide">
+    <span class="label">Question</span>
+    <textarea name="question" rows="3" required placeholder="How many quotes does a $20,000 purchase need?">{{ form.question }}</textarea>
+  </label>
+  <div class="row">
+    <label class="field">
+      <span class="label">User</span>
+      <select name="user_id" id="user-select">
+        {% for uid, tags in demo_users.items() %}
+        <option value="{{ uid }}" data-tags="{{ tags|join(', ') }}"{% if form.user_id == uid %} selected{% endif %}>{{ uid }} [{{ tags|join(', ') }}]</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field">
+      <span class="label">Extra tags <small>(comma separated)</small></span>
+      <input type="text" name="tags" value="{{ form.tags }}" placeholder="finance, legal">
+    </label>
+    <fieldset class="field mode">
+      <legend class="label">Mode</legend>
+      <div class="seg">
+        <label><input type="radio" name="mode" value="answer"{% if form.mode != 'agent' %} checked{% endif %}><span>answer</span></label>
+        <label><input type="radio" name="mode" value="agent"{% if form.mode == 'agent' %} checked{% endif %}><span>agent</span></label>
+      </div>
+    </fieldset>
+    <div class="field submit">
+      <button type="submit" class="primary">Ask</button>
+    </div>
+  </div>
+</form>
+
+<section id="result" aria-live="polite">
+{% if result %}{% with r = result %}{% include "_result.html" %}{% endwith %}{% endif %}
+</section>
+{% endblock %}

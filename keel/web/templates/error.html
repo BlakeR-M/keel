@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Keel · {{ status_code }}{% endblock %}
+{% block content %}
+<section class="intro">
+  <p class="crumbs">status {{ status_code }}</p>
+  <h1>{{ status_code }}</h1>
+  <p class="lede">{{ message }}</p>
+  <p class="actions"><a class="button primary" href="/">Back to chat</a><a class="button" href="/admin">Admin</a></p>
+</section>
+{% endblock %}

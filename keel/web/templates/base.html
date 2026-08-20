@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0f1317">
+<meta name="description" content="Keel is a sovereign retrieval and agent appliance: cited answers from your own documents, permission filtering before generation, write actions behind human approval, and a hash-chained audit ledger. Everything stays in the building.">
+<meta property="og:title" content="Keel">
+<meta property="og:description" content="Cited answers from your own documents, with permission filtering before generation and a hash-chained audit ledger. Everything stays in the building.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<title>{% block title %}Keel{% endblock %}</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23161b21'/%3E%3Cpath d='M4.5 3v10M4.5 8l6-5M4.5 8l6 5' stroke='%237aa2c8' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/keel.css">
+</head>
+<body>
+{# Air-gap status reaches the footer as `airgap` when a route passes it, or through the admin page's settings. #}
+{% set air = airgap if airgap is defined else (settings.airgap if settings is defined and settings.airgap is defined else none) %}
+<header class="top">
+  <div class="wrap bar">
+    <a class="brand" href="/" aria-label="Keel, chat page">
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect width="16" height="16" rx="3" fill="#0f1317"/><path d="M4.5 3v10M4.5 8l6-5M4.5 8l6 5" stroke="#7aa2c8" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Keel
+    </a>
+    <nav aria-label="Sections">
+      <a href="/"{% if active == 'chat' %} class="on" aria-current="page"{% endif %}>Chat</a>
+      <a href="/admin"{% if active == 'admin' %} class="on" aria-current="page"{% endif %}>Admin</a>
+      <a href="/health"{% if active == 'health' %} class="on" aria-current="page"{% endif %}>Health</a>
+    </nav>
+    {% if profile %}<span class="pill" title="Deploy profile">{{ profile }}</span>{% endif %}
+  </div>
+</header>
+<main class="wrap">
+{% block content %}{% endblock %}
+</main>
+<footer class="foot">
+  <div class="wrap foot-row">
+    <span class="foot-brand">Keel <span class="mono">{{ version }}</span></span>
+    <span class="foot-status" title="Deploy profile and air-gap state">
+      {% if profile %}<span>profile <span class="mono">{{ profile }}</span></span>{% endif %}
+      {% if air is not none %}<span><span class="dot{% if not air %} off{% endif %}" aria-hidden="true"></span> air-gap {{ 'on' if air else 'off' }}</span>{% endif %}
+    </span>
+    <span class="foot-note">Answers stay on this appliance; every request lands in the ledger.</span>
+  </div>
+</footer>
+<script src="/static/keel.js" defer></script>
+</body>
+</html>

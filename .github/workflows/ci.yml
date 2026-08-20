@@ -1,0 +1,110 @@
+# Keel continuous integration: lint, unit tests, Bicep build, and the eval regression gate on fakes.
+#
+# Integration tests (marker `integration`) need a llama-server or the network and stay out of CI;
+# they skip cleanly on their own when the endpoint is unreachable, and `-m "not integration"` keeps
+# the run short and deterministic. No LLM runs in CI: the eval gate exercises the eval harness through
+# the fakes in tests/test_evals.py.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  HF_HUB_DISABLE_SYMLINKS_WARNING: "1"
+  # fastembed reads its ONNX models from here; cached between runs so only the first run downloads.
+  FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.fastembed-cache
+
+jobs:
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install Keel with dev and azure extras
+        run: python -m pip install -e ".[dev,azure]"
+      - name: ruff check
+        run: python -m ruff check .
+
+  test:
+    name: pytest (unit, no LLM)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install Keel with dev and azure extras
+        run: python -m pip install -e ".[dev,azure]"
+      - name: Cache fastembed models
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.FASTEMBED_CACHE_PATH }}
+          key: fastembed-bge-small-en-v1.5-ms-marco-minilm-l-6-v2
+      - name: Unit and contract tests
+        run: python -m pytest -m "not integration" -q -p no:cacheprovider
+
+  bicep:
+    name: bicep build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the Bicep CLI from the GitHub release binary
+        run: |
+          curl -fsSL -o bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+          chmod +x bicep
+          sudo mv bicep /usr/local/bin/bicep
+          bicep --version
+      - name: Build the resource-group template
+        run: bicep build deploy/azure/main.bicep --stdout > /dev/null
+      - name: Build the subscription-scope wrapper
+        run: bicep build deploy/azure/subscription.bicep --stdout > /dev/null
+      - name: Lint both templates
+        run: |
+          bicep lint deploy/azure/main.bicep
+          bicep lint deploy/azure/subscription.bicep
+
+  eval-gate:
+    name: eval gate (fakes)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install Keel with dev extras
+        run: python -m pip install -e ".[dev]"
+      - name: Cache fastembed models
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.FASTEMBED_CACHE_PATH }}
+          key: fastembed-bge-small-en-v1.5-ms-marco-minilm-l-6-v2
+      - name: Run the eval harness against fakes (golden set, metrics, judge parsing, regression gate)
+        run: |
+          mkdir -p reports
+          python -m pytest tests/test_evals.py -q -p no:cacheprovider --junitxml=reports/junit-evals.xml
+      - name: Upload eval reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-reports
+          path: reports/
+          if-no-files-found: ignore
+          retention-days: 14

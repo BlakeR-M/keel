@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Keel · Health{% endblock %}
+{% block content %}
+<section class="intro">
+  <h1>Health</h1>
+  <p class="lede">Live numbers from this appliance.</p>
+</section>
+<section class="boxed block">
+  <ul class="facts">
+    <li><span class="k">status</span> <span class="v">{{ health.status }}</span></li>
+    <li><span class="k">profile</span> <span class="v">{{ health.profile }}</span></li>
+    <li><span class="k">model reachable</span> <span class="v">{{ 'yes' if health.llm else 'no' }}</span></li>
+    <li><span class="k">documents</span> <span class="v">{{ health.documents }}</span></li>
+    <li><span class="k">chunks</span> <span class="v">{{ health.chunks }}</span></li>
+    <li><span class="k">quarantined</span> <span class="v">{{ health.quarantined }}</span></li>
+    <li><span class="k">ledger rows</span> <span class="v">{{ health.ledger_seq }}</span></li>
+  </ul>
+</section>
+{% endblock %}
