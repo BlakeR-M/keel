@@ -7,13 +7,13 @@ Docker Compose stack, the air-gap guard and how to prove it, model swaps, backup
 
 ## Hardware notes
 
-Reference machine (Canberra, 2026-08-18): Windows 10, 32 logical cores, RTX 5080 with 16 GB VRAM.
+Reference machine: Windows 10, 32 logical cores, an RTX 5080 with 16 GB VRAM.
 
-- **Tonight the GPU is busy** with an unrelated training run, so Keel runs the local LLM on the CPU:
+- **With the GPU otherwise occupied**, Keel runs the local LLM on the CPU:
   Qwen2.5-3B-Instruct Q4_K_M (`D:\models\qwen2.5-3b-instruct-q4_k_m.gguf`, about 2 GB), `-ngl 0`,
   roughly 8 to 20 tokens per second depending on prompt length. Answers with citations take a few
   seconds; that is the demo budget.
-- **When the GPU is free**, swap to Qwen3.5-9B Q5_K_M (`D:\models\Qwen3.5-9B-Q5_K_M.gguf`, about
+- **With the GPU available**, swap to Qwen3.5-9B Q5_K_M (`D:\models\Qwen3.5-9B-Q5_K_M.gguf`, about
   6.5 GB) with `-ngl 99` for full offload. Generation runs several times faster than the CPU path
   and answer quality rises noticeably. Nothing in Keel changes; only the server flags do.
 - Embeddings and reranking stay on the CPU in every configuration: `BAAI/bge-small-en-v1.5` (384

@@ -135,8 +135,8 @@ keel approvals list --status pending
 # id  status   tool           requested                 decided by  arguments
 # 1   pending  create_ticket  2026-08-18T13:44:06.542Z              {"body": "The level 2 printer is jammed.", "title": "Printer down"}
 
-keel approvals approve 1 --by blake
-# approved 1 (create_ticket) by blake
+keel approvals approve 1 --by owner
+# approved 1 (create_ticket) by owner
 # executed: ticket created: Printer down (#1)
 ```
 

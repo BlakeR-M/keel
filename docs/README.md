@@ -13,7 +13,6 @@ command in them runs from the repository root with the project interpreter.
 | [`evals.md`](evals.md) | You want to know how quality is measured: the golden set, the metrics and their definitions, the LLM judge and its prompt, the regression gate, the HTML report, and the numbers observed. |
 | [`onprem.md`](onprem.md) | You are deploying on one machine: the native runners, hardware notes, the model swap, air-gap mode and how to prove it, Docker Compose, backups and upgrades. |
 | [`deploy-azure.md`](deploy-azure.md) | You are deploying to Azure. A short pointer; [`../deploy/azure/README.md`](../deploy/azure/README.md) is the authoritative guide. |
-| [`clients.md`](clients.md) | You are running a client pilot: the sequence from first conversation to a running appliance, and where the boundaries sit. The overlay format is in [`../clients/README.md`](../clients/README.md). |
 | [`threat-model.md`](threat-model.md) | You are reviewing security: assets, actors, trust boundaries, twelve threats with their controls, residual risks, and a command per control. [`../SECURITY.md`](../SECURITY.md) is the short public version. |
 | [`demo-script.md`](demo-script.md) | You are recording or presenting the demo: a ninety-second script with what to type and what to point at, plus a block of questions to try. |
 

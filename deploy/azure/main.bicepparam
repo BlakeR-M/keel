@@ -4,7 +4,7 @@ using './main.bicep'
 
 // Image that runs Keel. Build with deploy/onprem/Dockerfile and push to any registry, or use a
 // published image. For a private registry also set registryServer and grant the identity AcrPull.
-param image = 'ghcr.io/nightwing444/keel:latest'
+param image = 'ghcr.io/<your-org>/keel:latest'
 param registryServer = ''
 
 param namePrefix = 'keel'

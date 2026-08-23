@@ -89,14 +89,10 @@ code-complete for Azure against mocked SDK clients, with evaluation, policy and 
   `DefaultAzureCredential` and no keys.
 - **AWS stub** (`keel/providers/aws.py`, `deploy/aws/README.md`): interfaces and the mapping to
   Bedrock and OpenSearch Serverless; honest about being a stub.
-- **Client overlays** (`clients/`): `example-agency` and `example-gym` overlays with `keel.yaml` (settings,
-  roles to ACL tags, pilot users), `policy.yaml`, a manifest template, a runbook and a
-  needs-from-client checklist; parallel structure so a third client is a copy; no client data in the
-  repository, enforced by `tests/test_clients.py`.
 - **CI** (`.github/workflows/ci.yml`): ruff, unit tests without an LLM, `bicep build` and `bicep
   lint` from the release binary, and the eval gate against fakes with report upload.
 - **Docs**: `README.md`, `docs/onprem.md`, `deploy/azure/README.md`, `docs/threat-model.md`,
-  `docs/clients.md`, `SECURITY.md`, this changelog.
+  `SECURITY.md`, this changelog.
 - **Front door and walkthroughs**: the top-level `README.md` written for a reviewer (controls with
   the code and the test behind each, the sixty-second demo, architecture diagrams, the evaluation
   numbers from the 2026-08-18 run, what is stubbed or unverified, the repository map);

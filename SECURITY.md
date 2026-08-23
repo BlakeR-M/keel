@@ -13,7 +13,7 @@ model with the file that implements each control lives in `docs/threat-model.md`
 | 0.1.x (current) | Yes: security fixes land on `main` and are tagged. |
 | Anything earlier | Pre-release scaffolding; upgrade to 0.1.x. |
 
-Keel is early software with two pilot deployments. Fixes ship as patch releases on the current minor
+Keel is early software. Fixes ship as patch releases on the current minor
 version; there is no long-term support branch yet.
 
 ## Reporting a vulnerability
@@ -26,7 +26,7 @@ Report privately, and give the maintainer time to fix before anything is public:
 
 Include the version or commit, the deployment profile (local or azure), steps to reproduce, and what
 an attacker gains. You will hear back within five working days with a first assessment, and again when
-a fix is available. Findings that involve a client pilot are handled with that client directly.
+a fix is available.
 Please keep client documents and personal information out of the report; a redacted reproduction on
 the fixture corpus (`fixtures/corpus/`) is ideal.
 
@@ -68,8 +68,8 @@ the fixture corpus (`fixtures/corpus/`) is ideal.
   verify and export) are open to any request arriving on loopback. Beyond loopback they require the
   `X-Keel-Admin-Token` header matching `KEEL_ADMIN_TOKEN`. Anyone with a shell on the appliance is an
   admin; protect the machine.
-- **Identity is self-asserted in the pilot build.** The chat page offers a user picker; there is no
-  password. The pilot's guard is the machine's own login plus the loopback bind. Per-person login is
+- **Identity is self-asserted in the 0.1.x build.** The chat page offers a user picker; there is no
+  password. The guard is the machine's own login plus the loopback bind. Per-person login is
   a later release; until then, one appliance per business on a machine that business controls.
 - **The LLM can still be wrong.** Citations point at the chunks the answer drew on and the refusal gate
   stops guessing when retrieval is weak, but a fluent answer can still misread a passage. Read the
@@ -93,7 +93,7 @@ the fixture corpus (`fixtures/corpus/`) is ideal.
 
 ## Secure deployment checklist
 
-On-premise (the pilots):
+On-premise:
 
 - [ ] `KEEL_AIRGAP=1`, and the app bound to `127.0.0.1` (`KEEL_HOST` default). Prove it with
       `pytest tests/test_airgap.py -q` on the box and one live check from `docs/onprem.md`.
