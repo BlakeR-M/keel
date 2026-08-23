@@ -1,0 +1,452 @@
+{% extends "base.html" %}
+{% block title %}Keel · Sovereign retrieval and agent appliance{% endblock %}
+{% block content %}
+
+<section class="hero">
+  <p class="eyebrow">Sovereign retrieval and agent appliance</p>
+  <h1>Ask your own documents. Keep them in the building.</h1>
+  <p class="hero-lede">
+    Keel runs where the documents already live: one machine on premise, a network with no route out,
+    or your own Azure tenancy on managed identity with no keys in code. Permission filtering happens
+    inside retrieval, so the model only ever sees chunks the person asking is entitled to. Every
+    answer cites the exact chunk it came from, every write action waits for a person, and every
+    request lands in a hash-chained ledger.
+  </p>
+  <ul class="stat-strip">
+    <li><span class="stat-n">597</span><span class="stat-k">tests, 19 files</span></li>
+    <li><span class="stat-n">105</span><span class="stat-k">attack tests</span></li>
+    <li><span class="stat-n">27</span><span class="stat-k">review findings</span></li>
+    <li><span class="stat-n">5</span><span class="stat-k">guarded egress layers</span></li>
+    <li><span class="stat-n">0</span><span class="stat-k">keys in code, Azure profile</span></li>
+  </ul>
+  <div class="hero-actions">
+    <a class="button primary" href="#permissions">See permission filtering run</a>
+    <a class="button" href="/docs/security-review">Read the security review</a>
+    <a class="button ghost" href="{{ github }}">Source on GitHub</a>
+  </div>
+  <p class="hero-note">
+    Built by <strong>Blake Rowlands-Mowle</strong>. Apache 2.0, Python 3.11 and up. Every
+    demonstration below runs the production code path live rather than replaying a recording.{% if picker %}
+    This instance answers from a fixture corpus of five documents that hold nothing real.{% endif %}
+  </p>
+</section>
+
+{# ------------------------------------------------------------------ demo one: permissions #}
+
+<section class="block" id="permissions">
+  <p class="kicker">Demonstration one</p>
+  <h2>One question. Two identities. One of them gets an answer.</h2>
+  <p class="lede">
+    The fixture corpus holds a salary-bands document tagged <span class="mono">hr</span>. Ask the same
+    restricted question as <span class="mono">public</span> and as <span class="mono">hr-officer</span>
+    and read the two results side by side. Both are real requests through the same engine, running now.
+  </p>
+  {% if picker %}
+  <div class="compare-launch">
+    <button type="button" id="demo-compare" class="button primary" data-question="{{ compare_question }}">Ask as both users</button>
+    <span class="compare-note">&ldquo;{{ compare_question }}&rdquo;</span>
+  </div>
+  <noscript>
+    <p class="banner">
+      The side-by-side comparison needs JavaScript. Without it, ask the same question as each user on
+      <a href="/chat">the demonstration page</a>, which posts the plain form and renders the result
+      server-side.
+    </p>
+  </noscript>
+  <section id="compare" aria-live="polite"></section>
+  {% else %}
+  <p class="banner">
+    The identity picker belongs to the hosted demonstration and to loopback. This deployment takes
+    identity from its reverse proxy, so the comparison runs from the command line instead. See
+    <a href="/docs/web">the web documentation</a>.
+  </p>
+  {% endif %}
+  <div class="explain">
+    <h3>What that shows</h3>
+    <dl class="explain-list">
+      <dt>The filter sits inside the retriever</dt>
+      <dd>
+        BM25 and the vector index each apply the entitlement filter as part of their own query, before
+        the two result sets are fused and before the reranker sees anything. An unentitled chunk is
+        never a candidate, so it cannot be reranked into a prompt by a high similarity score.
+      </dd>
+      <dt>The refusal costs zero model calls</dt>
+      <dd>
+        When nothing entitled clears the relevance line, Keel says so and stops. No prompt is built and
+        no text is generated, so there is no output for a clever question to steer.
+      </dd>
+      <dt>The boundary is checked twice</dt>
+      <dd>
+        Finding A7 of the review added a second entitlement check at the generation boundary, so a
+        retrieval bug alone is not enough to put a restricted chunk in front of the model.
+      </dd>
+      <dt>The answer carries its source</dt>
+      <dd>
+        Each citation opens the exact chunk it came from, and the source viewer applies the same
+        entitlement check, so a citation link is never a way around the filter.
+      </dd>
+    </dl>
+    <p class="proof">
+      Code: <a href="{{ github }}/blob/main/keel/retrieval/bm25.py">keel/retrieval/bm25.py</a>,
+      <a href="{{ github }}/blob/main/keel/providers/local_index.py">keel/providers/local_index.py</a>,
+      <a href="{{ github }}/blob/main/keel/answer/engine.py">keel/answer/engine.py</a>.
+      Proof: <a href="{{ github }}/blob/main/tests/redteam_acl_and_retrieval_leakage.py">tests/redteam_acl_and_retrieval_leakage.py</a>.
+    </p>
+  </div>
+</section>
+
+{# ------------------------------------------------------------------ demo two: the air gap #}
+
+<section class="block" id="airgap">
+  <p class="kicker">Demonstration two</p>
+  <h2>Name any host. Watch five layers refuse it.</h2>
+  <p class="lede">
+    Air-gap mode installs guards across the whole process. Type a host and Keel starts a child process
+    with the guard on, points every guarded layer at it, and reports what each one did. The refusal
+    text below comes from the exception itself.
+  </p>
+  <form id="airgap-form" class="probe">
+    <label class="field wide">
+      <span class="label">Host to attempt</span>
+      <input type="text" name="host" id="airgap-host" value="data.attacker.example" spellcheck="false" autocomplete="off" maxlength="253">
+    </label>
+    <div class="probe-actions">
+      <button type="submit" class="button primary">Attempt the connection</button>
+      <span class="probe-hint">Try
+        <button type="button" class="linkish" data-host="data.attacker.example">data.attacker.example</button>,
+        <button type="button" class="linkish" data-host="8.8.8.8">8.8.8.8</button>, or
+        <button type="button" class="linkish" data-host="localhost">localhost</button>.
+      </span>
+    </div>
+  </form>
+  <noscript>
+    <p class="banner">
+      This demonstration needs JavaScript. From a shell the same thing reads
+      <span class="mono">curl -X POST /api/airgap-probe -d '{"host":"data.attacker.example"}'</span>,
+      and on your own machine <span class="mono">KEEL_AIRGAP=1 keel status</span> reports the guard.
+    </p>
+  </noscript>
+  <section id="airgap-result" aria-live="polite"></section>
+  <div class="explain">
+    <h3>Why each layer is guarded on its own</h3>
+    <dl class="explain-list">
+      <dt>Name resolution, before the socket</dt>
+      <dd>
+        A lookup of <span class="mono">&lt;secret&gt;.attacker.example</span> carries the secret to a
+        name server whether or not the connection ever happens, so it is an exfiltration channel by
+        itself. Review finding G1 closed that: names outside the allow list are refused at
+        <span class="mono">getaddrinfo</span>, and the control test now asserts that the resolver was
+        never even asked.
+      </dd>
+      <dt>The event loop needs its own guard</dt>
+      <dd>
+        On Windows the proactor loop connects through <span class="mono">ConnectEx</span> and never
+        calls <span class="mono">socket.connect</span>, so patching the socket alone leaves a path
+        open. Both loop families are guarded at <span class="mono">sock_connect</span>.
+      </dd>
+      <dt>Library layers refuse before they send</dt>
+      <dd>
+        <span class="mono">urllib</span> is checked at <span class="mono">OpenerDirector.open</span>,
+        ahead of any handler. <span class="mono">httpx</span> is checked by a guarded transport and a
+        request hook, which is what covers the client handed to the OpenAI SDK.
+      </dd>
+      <dt>Nothing here can reach out on your behalf</dt>
+      <dd>
+        A host outside the allow list is unreachable, which is the property being shown. A host inside
+        the allow list is answered from the policy and never connected to, so loopback stays out of
+        reach as well.
+      </dd>
+    </dl>
+    <p class="proof">
+      Code: <a href="{{ github }}/blob/main/keel/airgap.py">keel/airgap.py</a>.
+      Proof: <a href="{{ github }}/blob/main/tests/test_airgap.py">tests/test_airgap.py</a> and the
+      air-gap section of
+      <a href="{{ github }}/blob/main/tests/redteam_ledger_integrity_injection_screening_and_air_gap.py">the ledger and air-gap red-team file</a>.
+    </p>
+  </div>
+</section>
+
+{# ------------------------------------------------------------------ demo three: redaction #}
+
+<section class="block" id="redaction">
+  <p class="kicker">Demonstration three</p>
+  <h2>Australian identifiers, redacted with their check digits verified.</h2>
+  <p class="lede">
+    Tax file numbers, Medicare numbers and ABNs are validated against their own check digits rather
+    than matched on shape alone, which is what keeps an invoice number from being redacted as a tax
+    file number. Edit the text and run it through the same function the pipeline uses.
+  </p>
+  <form id="redact-form" class="probe">
+    <label class="field wide">
+      <span class="label">Text</span>
+      <textarea name="text" id="redact-text" rows="5" spellcheck="false">{{ redact_sample }}</textarea>
+    </label>
+    <div class="probe-actions">
+      <button type="submit" class="button primary">Redact it</button>
+      <span class="probe-hint">Runs <span class="mono">keel.safety.pii.redact</span> in process. A pure function, with no store and no model.</span>
+    </div>
+  </form>
+  <noscript>
+    <p class="banner">
+      This demonstration needs JavaScript. From a shell the same thing reads
+      <span class="mono">curl -X POST /api/redact -d '{"text":"ABN 51 824 753 556"}'</span>.
+    </p>
+  </noscript>
+  <section id="redact-result" aria-live="polite"></section>
+  <p class="proof">
+    Code: <a href="{{ github }}/blob/main/keel/safety/pii.py">keel/safety/pii.py</a>.
+    Proof: <a href="{{ github }}/blob/main/tests/test_safety.py">tests/test_safety.py</a>, plus review
+    findings S1 and S2 on numbers wrapped across a line and on non-ASCII email.
+  </p>
+</section>
+
+{# ------------------------------------------------------------------ how it works #}
+
+<section class="block" id="how">
+  <h2>How a question travels</h2>
+  <p class="lede">
+    Every stage below runs on the appliance. Nothing in the path reaches an external service, and the
+    Azure profile swaps the components for their tenancy equivalents without changing the shape.
+  </p>
+  <ol class="pipeline">
+    <li>
+      <span class="step-n">1</span>
+      <div>
+        <h3>Ingest, tagged and screened</h3>
+        <p>
+          PDF, DOCX, Markdown, HTML and plain text load into section-aware chunks, each carrying the
+          entitlement tags of its document. Every chunk is screened for prompt injection together with
+          its own heading and its document title, because an instruction in a heading rides into every
+          prompt through the source label. A flagged chunk lands in quarantine and stays out of
+          retrieval until a person releases it. Re-ingesting the same bytes adds nothing.
+        </p>
+      </div>
+    </li>
+    <li>
+      <span class="step-n">2</span>
+      <div>
+        <h3>Retrieve, filtered inside the query</h3>
+        <p>
+          BM25 and a vector index run in parallel, each applying the entitlement filter as part of its
+          own query. The two result sets are fused, then a cross-encoder reranks what survived. The
+          filter runs before the fusion and before the reranker, so an unentitled chunk is never a
+          candidate for either.
+        </p>
+      </div>
+    </li>
+    <li>
+      <span class="step-n">3</span>
+      <div>
+        <h3>Answer, or say the sources do not cover it</h3>
+        <p>
+          A local model writes the answer from the entitled chunks alone, and each claim carries a
+          citation to the chunk it came from. When nothing entitled clears the relevance line, Keel
+          says that plainly and makes no model call at all.
+        </p>
+      </div>
+    </li>
+    <li>
+      <span class="step-n">4</span>
+      <div>
+        <h3>Act, under a written policy, behind a person</h3>
+        <p>
+          Agent mode calls typed tools: document search, read-only SQL, a bounded calculator, ticket
+          creation. The policy is written down rather than implied, read-only SQL runs under an
+          authorizer with a size cap, and every write action waits in an approval queue. The policy is
+          re-checked at the moment of execution, so an approval cannot outlive the policy that
+          permitted it.
+        </p>
+      </div>
+    </li>
+    <li>
+      <span class="step-n">5</span>
+      <div>
+        <h3>Record, in a chain that shows tampering</h3>
+        <p>
+          Every request, retrieval, answer, tool call and approval appends to a hash-chained ledger.
+          Each row hashes a canonical JSON array of the chained fields, so moving a character across a
+          field boundary changes the hash. The ledger exports as strict JSON lines and verifies from a
+          file, which is what an assessor asks for.
+        </p>
+      </div>
+    </li>
+  </ol>
+  <p class="proof">
+    The whole path in detail: <a href="/docs/architecture">the architecture document</a>. The attacks it
+    was designed against: <a href="/docs/threat-model">the threat model</a>.
+  </p>
+</section>
+
+{# ------------------------------------------------------------------ the review #}
+
+<section class="block" id="review">
+  <h2>The security review, published with its open findings</h2>
+  <p class="lede">
+    Before Keel was first published, three independent reviewers were pointed at the security-bearing
+    paths with one instruction: break them. The result is 105 attack tests, 27 findings, and every
+    finding of medium severity or above fixed in the same release. The tests live in the repository
+    and run in the default suite.
+  </p>
+  <ul class="scoreboard">
+    <li><span class="score-n">27</span><span class="score-k">findings</span></li>
+    <li><span class="score-n">25</span><span class="score-k">fixed, each with the test that proves it</span></li>
+    <li><span class="score-n">2</span><span class="score-k">open by choice, one medium and one low</span></li>
+    <li><span class="score-n">174</span><span class="score-k">adversarial cases in the suite</span></li>
+  </ul>
+  <div class="explain">
+    <h3>The two that stay open, and why</h3>
+    <p>
+      Both are recorded as strict expected failures, so the day either one starts passing the suite
+      says so. The medium is a paraphrased injection carrying no trigger word the heuristics key on,
+      which the language-model judge at ingest covers instead. The low is a heuristic false positive on
+      a genuine operations note, which an operator releases from the quarantine list. Publishing them
+      is the point: a control list with nothing open on it is a control list that has not been tested.
+    </p>
+    <p class="actions inline">
+      <a class="button primary" href="/docs/security-review">Read all 27 findings</a>
+      <a class="button" href="/docs/threat-model">Read the threat model</a>
+    </p>
+  </div>
+</section>
+
+{# ------------------------------------------------------------------ controls #}
+
+<section class="block" id="controls">
+  <h2>What is claimed, where it lives, and what proves it</h2>
+  <div class="table-wrap">
+    <table class="grid">
+      <thead>
+        <tr><th>Control</th><th>Where it lives</th><th>What proves it</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Entitlement filtering inside retrieval, re-checked at generation</td>
+          <td class="ref"><a href="{{ github }}/blob/main/keel/retrieval/bm25.py">retrieval/bm25.py</a>, <a href="{{ github }}/blob/main/keel/providers/local_index.py">providers/local_index.py</a></td>
+          <td class="ref"><a href="{{ github }}/blob/main/tests/redteam_acl_and_retrieval_leakage.py">redteam_acl_and_retrieval_leakage.py</a></td>
+        </tr>
+        <tr>
+          <td>Air-gap egress refusal at socket, resolver, event loop, urllib and httpx</td>
+          <td class="ref"><a href="{{ github }}/blob/main/keel/airgap.py">airgap.py</a></td>
+          <td class="ref"><a href="{{ github }}/blob/main/tests/test_airgap.py">test_airgap.py</a></td>
+        </tr>
+        <tr>
+          <td>Prompt-injection screening at ingest, with quarantine and an optional model judge</td>
+          <td class="ref"><a href="{{ github }}/blob/main/keel/safety/injection.py">safety/injection.py</a></td>
+          <td class="ref"><a href="{{ github }}/blob/main/tests/test_safety.py">test_safety.py</a></td>
+        </tr>
+        <tr>
+          <td>PII detection and redaction, Australian formats with check digits</td>
+          <td class="ref"><a href="{{ github }}/blob/main/keel/safety/pii.py">safety/pii.py</a></td>
+          <td class="ref"><a href="{{ github }}/blob/main/tests/test_safety.py">test_safety.py</a></td>
+        </tr>
+        <tr>
+          <td>Hash-chained ledger, strict JSON export, verification from a file</td>
+          <td class="ref"><a href="{{ github }}/blob/main/keel/safety/ledger.py">safety/ledger.py</a></td>
+          <td class="ref"><a href="{{ github }}/blob/main/tests/redteam_ledger_integrity_injection_screening_and_air_gap.py">redteam_ledger_&hellip;.py</a></td>
+        </tr>
+        <tr>
+          <td>Typed tools under a written policy, writes held in an approval queue</td>
+          <td class="ref"><a href="{{ github }}/blob/main/keel/agent/policy.py">agent/policy.py</a>, <a href="{{ github }}/blob/main/keel/agent/approvals.py">agent/approvals.py</a></td>
+          <td class="ref"><a href="{{ github }}/blob/main/tests/redteam_tool_policy_and_approvals.py">redteam_tool_policy_and_approvals.py</a></td>
+        </tr>
+        <tr>
+          <td>Identity from an authenticating proxy beyond loopback, never from the request body</td>
+          <td class="ref"><a href="{{ github }}/blob/main/keel/web/app.py">web/app.py</a></td>
+          <td class="ref"><a href="{{ github }}/blob/main/tests/test_web.py">test_web.py</a></td>
+        </tr>
+        <tr>
+          <td>Cloud profile with no keys: managed identity, local key auth disabled in the template</td>
+          <td class="ref"><a href="{{ github }}/blob/main/keel/providers/azure.py">providers/azure.py</a>, <a href="{{ github }}/blob/main/deploy/azure/main.bicep">deploy/azure/main.bicep</a></td>
+          <td class="ref"><a href="{{ github }}/blob/main/tests/test_azure_provider.py">test_azure_provider.py</a></td>
+        </tr>
+        <tr>
+          <td>Answer quality measured, with a regression gate that fails a release</td>
+          <td class="ref"><a href="{{ github }}/blob/main/keel/evals/run.py">evals/run.py</a></td>
+          <td class="ref"><a href="{{ github }}/blob/main/tests/test_evals.py">test_evals.py</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{# ------------------------------------------------------------------ deployment #}
+
+<section class="block" id="deploy">
+  <h2>Where it runs</h2>
+  <div class="cards">
+    <article class="card">
+      <h3>On premise, one machine</h3>
+      <p>
+        A Python process, a SQLite store and a local model server. Compose files and native runners
+        ship in the repository, with a GPU variant for a larger model. Nothing leaves the machine.
+      </p>
+      <p class="card-foot"><a href="/docs/onprem">On-premise guide</a></p>
+    </article>
+    <article class="card">
+      <h3>Air-gapped</h3>
+      <p>
+        The same build with <span class="mono">KEEL_AIRGAP=1</span>. Egress is refused at five layers,
+        model caches are read from disk with offline flags set, and the allow list holds only the hosts
+        you name. Demonstration two above runs exactly this guard.
+      </p>
+      <p class="card-foot"><a href="/docs/onprem">Offline operation</a></p>
+    </article>
+    <article class="card">
+      <h3>Your own Azure tenancy</h3>
+      <p>
+        Azure OpenAI and Azure AI Search reached through a user-assigned managed identity, with no keys
+        anywhere in code or configuration. The Bicep template disables local key authentication on both
+        resources, and continuous integration builds and lints it on every change.
+      </p>
+      <p class="card-foot"><a href="/docs/deploy-azure">Azure deployment</a></p>
+    </article>
+  </div>
+</section>
+
+{# ------------------------------------------------------------------ practice #}
+
+<section class="block" id="practice">
+  <h2>Using it in practice</h2>
+  <p class="lede">
+    A fresh clone runs the whole appliance against the fixture corpus with no model server and no
+    network. The full walkthrough, including loading your own documents and reading the ledger, is in
+    <a href="/docs/tutorial">the tutorial</a>.
+  </p>
+  <pre class="code"><code>git clone {{ github }}.git
+cd keel
+python -m venv .venv &amp;&amp; .venv/bin/pip install -e ".[dev]"
+
+keel ingest --manifest fixtures/corpus.yaml          # 5 documents, 27 chunks, 1 quarantined
+keel ask 'What is the confidential review code for the 2026 pay round?' --tags public
+keel ask 'What is the confidential review code for the 2026 pay round?' --tags public,hr
+keel agent "Create a support ticket titled 'Printer down'."
+keel approvals list --status pending
+keel approvals approve 1 --by owner
+keel verify-ledger
+keel serve                                           # the appliance, on 127.0.0.1:8400</code></pre>
+  <p class="proof">
+    Every command and flag: <a href="/docs/cli">the CLI reference</a>. The web app, its routes and its
+    identity model: <a href="/docs/web">the web documentation</a>.
+  </p>
+</section>
+
+{# ------------------------------------------------------------------ docs #}
+
+<section class="block" id="read">
+  <h2>Documentation</h2>
+  <div class="cards">
+    {% for doc in docs %}
+    <article class="card">
+      <h3><a href="/docs/{{ doc.slug }}">{{ doc.title }}</a></h3>
+      <p>{{ doc.blurb }}</p>
+    </article>
+    {% endfor %}
+  </div>
+  <p class="actions inline">
+    <a class="button primary" href="/chat">Open the live demonstration</a>
+    <a class="button" href="/docs">All documentation</a>
+    <a class="button ghost" href="{{ github }}">Source on GitHub</a>
+  </p>
+</section>
+
+{% endblock %}

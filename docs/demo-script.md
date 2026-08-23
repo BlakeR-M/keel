@@ -30,7 +30,9 @@ takes and trim the waits, or narrate over them.
    This leaves `reports\latest.html` for the last beat and saves the baseline.
 
 3. Open two windows side by side: a terminal at the repository root and a browser at
-   <http://127.0.0.1:8400/>. Zoom the browser so the answer text and the chips read at recording size.
+   <http://127.0.0.1:8400/chat>, which is the appliance itself. The overview at
+   <http://127.0.0.1:8400/> is the page a stranger lands on, and it carries the same comparison as a
+   one-click demonstration. Zoom the browser so the answer text and the chips read at recording size.
 
 ## The script
 

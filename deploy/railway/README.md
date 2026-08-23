@@ -67,6 +67,8 @@ which Railway mounts root-owned) writable by the unprivileged `keel` user, and d
 | `KEEL_BOOTSTRAP_CORPUS` | `fixtures/corpus.yaml` | Ingest the fixture manifest at startup when the store is empty |
 | `KEEL_ADMIN_TOKEN` | a 32-byte hex secret | `/admin` needs `X-Keel-Admin-Token` equal to it |
 | `KEEL_PROXY_TOKEN` | unset | No reverse proxy asserts identity on the demo |
+| `KEEL_AIRGAP` | `1` | Egress guard on. Every outbound connection to a host outside the allow list is refused at five layers before a packet leaves |
+| `KEEL_AIRGAP_ALLOW_HOSTS` | `keel-llm.railway.internal` | The one host the app may reach: the model service over the private network. Loopback is always allowed |
 | `HF_HUB_OFFLINE` | `1` | fastembed reads only the baked cache |
 | `PORT` | set by Railway | The port uvicorn listens on |
 
@@ -88,6 +90,7 @@ railway add --service keel
 railway service link keel
 railway volume add --mount-path /data
 railway variables --set KEEL_PROFILE=local --set KEEL_HOST=0.0.0.0 ...   # see the table
+railway variables --set KEEL_AIRGAP=1 --set KEEL_AIRGAP_ALLOW_HOSTS=keel-llm.railway.internal
 railway up --service keel -d
 railway domain --service keel                                   # a *.up.railway.app URL
 railway domain keel.flow-through.com.au --service keel          # prints the CNAME target and a TXT verify record
@@ -115,12 +118,24 @@ curl -s -X POST $BASE/api/ask -H 'Content-Type: application/json' -d "{\"questio
 
 curl -s -o /dev/null -w '%{http_code}\n' $BASE/admin                                   # 401
 curl -s -o /dev/null -w '%{http_code}\n' -H "X-Keel-Admin-Token: $KEEL_ADMIN_TOKEN" $BASE/admin   # 200
+
+curl -s -X POST $BASE/api/airgap-probe -H 'Content-Type: application/json' \
+  -d '{"host":"data.attacker.example"}'
+# every guarded layer refuses it: dns, socket, asyncio, urllib, httpx
+
+curl -s -o /dev/null -w '%{http_code}\n' $BASE/docs/architecture   # 200: docs/ ships with the image
 ```
+
+The footer on every page reports the air-gap state, so `KEEL_AIRGAP=1` is also what keeps the demo
+from telling a visitor that the appliance's strongest control is switched off. With the allow list
+holding only `keel-llm.railway.internal`, the demo genuinely runs under the guard: the app reaches
+the model service over the private network and nothing else.
 
 ## What the demo is and is not
 
-It shows permission filtering before generation (one click on the chat page asks the restricted
-question as `public` and `hr-officer`, side by side), citations that open in the source viewer,
+It shows permission filtering before generation (one click on the overview page asks the restricted
+question as `public` and `hr-officer`, side by side), the air-gap guard refusing a host the visitor
+names, PII redaction over Australian identifiers, citations that open in the source viewer,
 refusal below the relevance line with zero model calls, the injection quarantine, the approval queue
 for the agent's write tool, and the hash-chained ledger, on documents that hold nothing real. Identity is the
 demo picker (`KEEL_DEMO_IDENTITY=1`), the store is read-only from the web, and admin needs the token.

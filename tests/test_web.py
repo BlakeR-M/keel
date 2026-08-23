@@ -106,9 +106,9 @@ def test_health_reports_status_and_store_counts(client: TestClient) -> None:
     assert body["ledger_seq"] >= 5
 
 
-def test_head_is_served_on_the_chat_page_and_health(client: TestClient) -> None:
+def test_head_is_served_on_every_page_a_link_can_point_at(client: TestClient) -> None:
     """Link checkers and unfurl bots probe with HEAD and read a 405 as a dead page."""
-    for path in ("/", "/health"):
+    for path in ("/", "/chat", "/docs", "/docs/architecture", "/health"):
         response = client.head(path)
         assert response.status_code == 200, path
 
@@ -161,7 +161,7 @@ def test_llm_probe_gives_up_after_the_timeout() -> None:
 
 
 def test_chat_page_renders_the_question_box(client: TestClient) -> None:
-    response = client.get("/")
+    response = client.get("/chat")
     assert response.status_code == 200
     html = response.text
     assert 'name="question"' in html
@@ -466,9 +466,11 @@ def test_admin_guard_requires_token_beyond_loopback(
         monkeypatch.setenv(ADMIN_TOKEN_ENV, "s3cret")
         assert client.get("/admin", headers={ADMIN_TOKEN_HEADER: "wrong"}).status_code == 401
         assert client.get("/admin", headers={ADMIN_TOKEN_HEADER: "s3cret"}).status_code == 200
-        # chat, health and source stay open
+        # the overview, the demo page, the docs and health stay open
         assert client.get("/health").status_code == 200
         assert client.get("/").status_code == 200
+        assert client.get("/chat").status_code == 200
+        assert client.get("/docs").status_code == 200
     finally:
         web_ctx.settings.host = original
     assert client.get("/admin").status_code == 200
@@ -582,14 +584,21 @@ def test_demo_identity_beyond_loopback(
         assert client.get("/admin").status_code == 401
         monkeypatch.setenv(ADMIN_TOKEN_ENV, "s3cret")
         assert client.get("/admin", headers={ADMIN_TOKEN_HEADER: "s3cret"}).status_code == 200
-        page = client.get("/")
+        page = client.get("/chat")
         assert page.status_code == 200
         assert ('id="demo-banner"' in page.text) is demo_identity
-        assert ('id="demo-compare"' in page.text) is demo_identity
         assert ('id="intro"' in page.text) is demo_identity
         if demo_identity:
-            assert SECRET_QUESTION in page.text, "the compare button should carry the restricted question"
             assert "How it runs internal operations" in page.text, "the intro dialog carries the four blocks"
+        # The comparison is the hero of the overview page, and it appears there only where the demo
+        # user picker is honoured. Beyond loopback that is the demo flag alone.
+        overview = client.get("/")
+        assert overview.status_code == 200
+        assert ('id="demo-compare"' in overview.text) is demo_identity
+        # The question itself also appears in the quickstart block, so pin the button's attribute
+        # rather than the bare string.
+        carried = f'data-question="{SECRET_QUESTION}"' in overview.text
+        assert carried is demo_identity
     finally:
         web_ctx.settings.host = original_host
         web_ctx.settings.demo_identity = original_flag
@@ -623,7 +632,11 @@ def test_demo_identity_ignores_extra_tags_and_unknown_users(
 
 def test_web_app_exposes_no_ingest_route_and_every_write_sits_under_admin() -> None:
     """The read-only demo posture: nothing on the web ingests, and approve, reject and quarantine
-    release are admin routes (token beyond loopback)."""
+    release are admin routes (token beyond loopback).
+
+    `/api/airgap-probe` and `/api/redact` are POST routes that change nothing: the first runs the
+    egress guard in a child process and the second is a pure function of its argument. They are
+    listed here so the set stays closed and a genuinely new write cannot be added unnoticed."""
     routes = []
     for route in app.routes:
         included = getattr(route, "original_router", None)
@@ -641,6 +654,8 @@ def test_web_app_exposes_no_ingest_route_and_every_write_sits_under_admin() -> N
         "/ask",
         "/api/ask",
         "/api/agent",
+        "/api/airgap-probe",
+        "/api/redact",
         "/admin/approvals/{approval_id}/approve",
         "/admin/approvals/{approval_id}/reject",
         "/admin/quarantine/{chunk_id}/release",

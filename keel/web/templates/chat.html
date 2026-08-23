@@ -1,7 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Keel · Chat{% endblock %}
+{% block title %}Keel · Live demonstration{% endblock %}
 {% block content %}
 <section class="intro">
+  <p class="crumbs"><a href="/">Overview</a> / Live demonstration</p>
   <h1>Ask the documents</h1>
   {% if demo %}
   <dialog id="intro" aria-labelledby="intro-title">
@@ -12,15 +13,19 @@
     <p><strong>How it runs internal operations.</strong> Agent mode calls typed tools under a written policy: document search, read-only SQL, a calculator, ticket creation. Write actions wait in an approval queue for a person, and every step is audited.</p>
     <form method="dialog"><button class="primary">Into the demo</button></form>
   </dialog>
-  <p class="banner" id="demo-banner">Hosted demo of the fixture corpus. Permission filtering is the demonstration: one question about a restricted document, asked as two users, side by side. <a href="#" id="intro-open">About this demo</a></p>
-  <div class="compare-launch">
-    <button type="button" id="demo-compare" class="primary" data-question="What is the confidential review code for the 2026 pay round?">Ask as both users</button>
-    <span class="compare-note">&ldquo;What is the confidential review code for the 2026 pay round?&rdquo; as <strong>public</strong> and as <strong>hr-officer</strong>.</span>
-  </div>
-  <section id="compare" aria-live="polite"></section>
+  <p class="banner" id="demo-banner">
+    Hosted demonstration of the fixture corpus, five documents holding nothing real. The permission
+    comparison runs on <a href="/#permissions">the overview page</a>, where the same restricted
+    question is asked as two users side by side. <a href="#" id="intro-open">About this demo</a>
+  </p>
   {% endif %}
   <p class="lede">Keel answers from the documents the selected user may read and cites each source. When the sources sit outside the question, it says so plainly. Agent mode lets the model call tools; write actions wait for a person on the <a href="/admin#approvals">admin page</a>.</p>
   <p class="lede">Retrieval is hybrid BM25 and vector, fused and reranked, with the permission filter applied inside the retriever, before fusion.</p>
+  <p class="hint">
+    Questions this corpus answers: how many written quotes a $20,000 purchase needs at Northbank
+    Council, how long the Harbour Clinic keeps patient records, and what the confidential review code
+    for the 2026 pay round is. That last one needs the <span class="mono">hr-officer</span> user.
+  </p>
 </section>
 
 <form id="ask-form" method="post" action="/ask" class="ask">

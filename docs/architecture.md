@@ -211,10 +211,13 @@ self-contained HTML page. [`evals.md`](evals.md) has the method and the numbers.
 
 ### `keel/web/app.py`, `views.py`, `templates/`, `static/`
 
-The FastAPI app: chat page (`GET /`), `POST /ask` (HTML partial, JSON, or the full page depending
-on the request), `POST /api/ask` and `POST /api/agent` (always JSON), `GET /source/{chunk_id}` (the
-chunk with its tags, 403 when the caller's tags share none of them), `GET /health`, and the admin
-router (`/admin`, `/admin/request/{id}`, approve and reject, quarantine release, ledger verify and
+The FastAPI app: the overview page (`GET /`, which carries the permission comparison, the air-gap
+probe and the redaction demonstration), the appliance itself (`GET /chat`), the documentation
+rendered from `docs/` (`GET /docs`, `GET /docs/{slug}`, `keel/web/docs.py`), `POST /ask` (HTML
+partial, JSON, or the full page depending on the request), `POST /api/ask` and `POST /api/agent`
+(always JSON), `POST /api/airgap-probe` and `POST /api/redact` (the two live control demonstrations,
+neither of which changes anything), `GET /source/{chunk_id}` (the chunk with its tags, 403 when the
+caller's tags share none of them), `GET /health`, and the admin router (`/admin`, `/admin/request/{id}`, approve and reject, quarantine release, ledger verify and
 export) behind `require_admin`, which is open on loopback and needs `X-Keel-Admin-Token` beyond it.
 The `AppContext` is built once in the lifespan handler or on first request and kept on
 `app.state.ctx`; the model and the agent run in a thread pool off the event loop. `views.py` is pure

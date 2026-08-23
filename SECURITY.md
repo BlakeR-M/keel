@@ -68,7 +68,7 @@ the fixture corpus (`fixtures/corpus/`) is ideal.
   verify and export) are open to any request arriving on loopback. Beyond loopback they require the
   `X-Keel-Admin-Token` header matching `KEEL_ADMIN_TOKEN`. Anyone with a shell on the appliance is an
   admin; protect the machine.
-- **Identity is self-asserted in the 0.1.x build.** The chat page offers a user picker; there is no
+- **Identity is self-asserted in the 0.1.x build.** The demonstration page offers a user picker; there is no
   password. The guard is the machine's own login plus the loopback bind. Per-person login is
   a later release; until then, one appliance per business on a machine that business controls.
 - **The LLM can still be wrong.** Citations point at the chunks the answer drew on and the refusal gate

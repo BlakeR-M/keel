@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0f1317">
-<meta name="description" content="Keel is a sovereign retrieval and agent appliance: cited answers from your own documents, permission filtering before generation, write actions behind human approval, and a hash-chained audit ledger. Everything stays in the building.">
+<meta name="description" content="Keel is a sovereign retrieval and agent appliance: cited answers from your own documents, permission filtering before generation, air-gap mode that refuses egress at five layers, write actions behind human approval, and a hash-chained audit ledger. Everything stays in the building.">
 <meta property="og:title" content="Keel">
 <meta property="og:description" content="Cited answers from your own documents, with permission filtering before generation and a hash-chained audit ledger. Everything stays in the building.">
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="Keel">
 <meta name="twitter:card" content="summary">
 <title>{% block title %}Keel{% endblock %}</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23161b21'/%3E%3Cpath d='M4.5 3v10M4.5 8l6-5M4.5 8l6 5' stroke='%237aa2c8' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
@@ -19,14 +20,16 @@
 {% set air = airgap if airgap is defined else (settings.airgap if settings is defined and settings.airgap is defined else none) %}
 <header class="top">
   <div class="wrap bar">
-    <a class="brand" href="/" aria-label="Keel, chat page">
+    <a class="brand" href="/" aria-label="Keel, overview">
       <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect width="16" height="16" rx="3" fill="#0f1317"/><path d="M4.5 3v10M4.5 8l6-5M4.5 8l6 5" stroke="#7aa2c8" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Keel
     </a>
     <nav aria-label="Sections">
-      <a href="/"{% if active == 'chat' %} class="on" aria-current="page"{% endif %}>Chat</a>
-      <a href="/admin"{% if active == 'admin' %} class="on" aria-current="page"{% endif %}>Admin</a>
+      <a href="/"{% if active == 'overview' %} class="on" aria-current="page"{% endif %}>Overview</a>
+      <a href="/chat"{% if active == 'chat' %} class="on" aria-current="page"{% endif %}>Demo</a>
+      <a href="/docs"{% if active == 'docs' %} class="on" aria-current="page"{% endif %}>Docs</a>
       <a href="/health"{% if active == 'health' %} class="on" aria-current="page"{% endif %}>Health</a>
+      <a href="/admin"{% if active == 'admin' %} class="on" aria-current="page"{% endif %}>Admin</a>
     </nav>
     {% if profile %}<span class="pill" title="Deploy profile">{{ profile }}</span>{% endif %}
   </div>
@@ -40,6 +43,11 @@
     <span class="foot-status" title="Deploy profile and air-gap state">
       {% if profile %}<span>profile <span class="mono">{{ profile }}</span></span>{% endif %}
       {% if air is not none %}<span><span class="dot{% if not air %} off{% endif %}" aria-hidden="true"></span> air-gap {{ 'on' if air else 'off' }}</span>{% endif %}
+    </span>
+    <span class="foot-links">
+      <a href="/docs">Documentation</a>
+      <a href="{{ github }}">Source on GitHub</a>
+      <a href="/docs/security-review">Security review</a>
     </span>
     <span class="foot-note">Answers stay on this appliance; every request lands in the ledger.</span>
   </div>

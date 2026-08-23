@@ -147,7 +147,7 @@ def test_base_template_carries_description_and_open_graph_tags(client: TestClien
 
 
 def test_chat_page_shows_favicon_footer_and_status(client: TestClient) -> None:
-    response = client.get("/")
+    response = client.get("/chat")
     assert response.status_code == 200
     html = response.text
     assert 'rel="icon" type="image/svg+xml" href="data:image/svg+xml,' in html

@@ -24,6 +24,7 @@ import logging
 import os
 import secrets
 import threading
+import time
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -44,6 +45,9 @@ from keel.db import transaction
 from keel.providers.factory import AppContext, build_context
 from keel.providers.local_index import parse_tags as parse_chunk_tags
 from keel.safety.ledger import VerifyResult
+from keel.safety.pii import DEFAULT_KINDS, redact
+from keel.web import airgap_probe
+from keel.web import docs as web_docs
 from keel.web.views import (
     DEMO_USERS,
     agent_json,
@@ -79,6 +83,27 @@ RECENT_LIMIT = 50
 TREND_DAYS = 14
 MODES = ("answer", "agent")
 DEFAULT_ACTOR = "admin"
+
+#: The restricted question the overview page asks as both demo users. It names a value that lives in
+#: an `hr`-tagged fixture document, so `public` is refused and `hr-officer` is answered with a citation.
+COMPARE_QUESTION = "What is the confidential review code for the 2026 pay round?"
+
+#: Starting text for the redaction demonstration. Every identifier here is invented and passes its own
+#: check digit, which is the point: shape alone would match far more than this.
+REDACT_SAMPLE = (
+    "Contractor onboarding note. Reach Jordan Ellery at jordan.ellery@example.com or 0412 345 678.\n"
+    "Tax file number 123 456 782, Medicare 2123 45670 1, ABN 51 824 753 556.\n"
+    "Purchase order 987654321 and invoice 4417 stay as written: neither is an identifier."
+)
+REDACT_MAX_CHARS = 4000
+
+#: One air-gap probe per this many seconds per client address. The probe starts a child process, so
+#: this keeps a held-down button from becoming a way to spend the appliance's CPU.
+PROBE_MIN_SECONDS = 3.0
+
+#: Probes running at once, across every caller. A child process costs memory while it lives, and the
+#: app already holds two embedding models, so a burst of visitors waits rather than crowds the box.
+PROBE_MAX_CONCURRENT = 2
 
 _ctx_lock = threading.Lock()
 
@@ -124,7 +149,7 @@ _env = Environment(
 _env.filters.update(
     {"thousands": _thousands, "clock": _clock, "short": _short, "pretty": _pretty, "percent": _percent}
 )
-_env.globals.update({"version": __version__, "demo_users": DEMO_USERS})
+_env.globals.update({"version": __version__, "demo_users": DEMO_USERS, "github": web_docs.GITHUB_REPO})
 
 
 def render(name: str, *, status: int = 200, **context: Any) -> HTMLResponse:
@@ -431,6 +456,73 @@ def health(request: Request) -> Response:
     return JSONResponse(body)
 
 
+# ---------------------------------------------------------------------- overview and documentation
+
+
+def identity_picker(ctx: AppContext) -> bool:
+    """True when this deployment honours the demo user picker, so the comparison can run in a browser.
+
+    That is loopback, where identity is self-asserted by design, and the hosted demo of the fixture
+    corpus (`KEEL_DEMO_IDENTITY=1`). Everywhere else identity comes from the operator's proxy and the
+    overview page says so instead of offering a picker that would be ignored.
+    """
+    host = getattr(ctx.settings, "host", "")
+    return is_loopback(host) or bool(getattr(ctx.settings, "demo_identity", False))
+
+
+@app.get("/", response_class=HTMLResponse)
+@app.head("/", response_class=HTMLResponse)
+def overview(request: Request) -> HTMLResponse:
+    """The front door: what Keel is, the three live demonstrations, and the way into the documentation.
+
+    A reader arriving cold from a link lands here rather than in the question box, so the security
+    posture is the first thing on the page instead of something to be inferred from a form.
+    """
+    ctx = get_ctx(request)
+    return render(
+        "landing.html",
+        active="overview",
+        profile=ctx.profile,
+        picker=identity_picker(ctx),
+        compare_question=COMPARE_QUESTION,
+        redact_sample=REDACT_SAMPLE,
+        docs=web_docs.index(),
+    )
+
+
+@app.get("/docs", response_class=HTMLResponse)
+@app.head("/docs", response_class=HTMLResponse)
+def docs_index(request: Request) -> HTMLResponse:
+    """Every document in `docs/`, rendered as pages of this site rather than left on GitHub."""
+    return render("docs_index.html", active="docs", profile=get_ctx(request).profile, docs=web_docs.index())
+
+
+@app.get("/docs/{slug}", response_class=HTMLResponse)
+@app.head("/docs/{slug}", response_class=HTMLResponse)
+def docs_page(request: Request, slug: str) -> Response:
+    """One document. An unknown slug is a 404 through the usual error page rather than a stack trace."""
+    doc = web_docs.page(slug)
+    if doc is None:
+        return error_response(request, 404, "That document is not one of the pages here.", partial_ok=False)
+    ordered = web_docs.slugs()
+    position = ordered.index(slug) if slug in ordered else -1
+    return render(
+        "doc.html",
+        active="docs",
+        profile=get_ctx(request).profile,
+        doc=doc,
+        prev=_neighbour(ordered, position - 1) if position > 0 else None,
+        next=_neighbour(ordered, position + 1) if position >= 0 else None,
+    )
+
+
+def _neighbour(ordered: list[str], index: int) -> web_docs.Doc | None:
+    """The document at `index` in reading order, or None when the index falls off either end."""
+    if 0 <= index < len(ordered):
+        return web_docs.page(ordered[index])
+    return None
+
+
 # ---------------------------------------------------------------------- chat
 
 
@@ -444,10 +536,10 @@ def chat_page(
     return render("chat.html", active="chat", profile=ctx.profile, form=values, result=result)
 
 
-@app.get("/", response_class=HTMLResponse)
-@app.head("/", response_class=HTMLResponse)
+@app.get("/chat", response_class=HTMLResponse)
+@app.head("/chat", response_class=HTMLResponse)
 def chat(request: Request) -> HTMLResponse:
-    """The chat page: question box, user select, free tags, answer or agent mode."""
+    """The live appliance: question box, user select, free tags, answer or agent mode."""
     return chat_page(get_ctx(request))
 
 
@@ -537,6 +629,93 @@ async def api_ask(request: Request) -> Response:
 async def api_agent(request: Request) -> Response:
     """JSON agent run for {question, user_id, tags}."""
     return await run_question(request, force_mode="agent")
+
+
+# ---------------------------------------------------------------------- live control demonstrations
+#
+# Two POST routes that change nothing. They exist so a reader can exercise a control rather than read
+# a claim about it. Neither touches the store, the model or the ledger.
+
+
+_probe_lock = threading.Lock()
+_probe_last: dict[str, float] = {}
+_probe_slots = threading.Semaphore(PROBE_MAX_CONCURRENT)
+
+
+def _probe_allowed(caller: str) -> bool:
+    """One probe per caller per `PROBE_MIN_SECONDS`. The probe starts a child process, so a held-down
+    button is worth slowing down; the map is bounded so it cannot grow into a memory leak."""
+    now = time.monotonic()
+    with _probe_lock:
+        if len(_probe_last) > 1024:
+            cutoff = now - PROBE_MIN_SECONDS
+            for key in [k for k, seen in _probe_last.items() if seen < cutoff]:
+                del _probe_last[key]
+        previous = _probe_last.get(caller)
+        if previous is not None and now - previous < PROBE_MIN_SECONDS:
+            return False
+        _probe_last[caller] = now
+        return True
+
+
+@app.post("/api/airgap-probe")
+async def api_airgap_probe(request: Request) -> Response:
+    """Attempt a connection to a named host, under the air-gap guard, and report what each layer did.
+
+    The attempts run in a child process started with `KEEL_AIRGAP=1`, so this worker's own guard state
+    stays as the operator set it and nobody else's request is affected. A host outside the allow list
+    cannot be reached, which is the property being demonstrated, and a host inside it is answered from
+    the policy without a connection. See `keel.web.airgap_probe`.
+    """
+    payload = await read_payload(request)
+    caller = request.client.host if request.client else "unknown"
+    if not _probe_allowed(caller):
+        return JSONResponse(
+            {"error": f"One probe every {PROBE_MIN_SECONDS:.0f} seconds. Try again shortly."},
+            status_code=429,
+        )
+    host = str(payload.get("host") or "")
+    if not _probe_slots.acquire(blocking=False):
+        return JSONResponse(
+            {"error": "The probe is busy with another visitor. Try again in a moment."},
+            status_code=429,
+        )
+    try:
+        body = await run_in_threadpool(airgap_probe.run, host)
+    finally:
+        _probe_slots.release()
+    return JSONResponse(body, status_code=400 if "error" in body else 200)
+
+
+@app.post("/api/redact")
+async def api_redact(request: Request) -> Response:
+    """Redact the submitted text and report what was found and where.
+
+    `keel.safety.pii.redact` is a pure function of its input: no store, no model, no network. The text
+    is neither kept nor logged, and the response carries the spans so a reader can see which characters
+    each check digit actually claimed.
+    """
+    payload = await read_payload(request)
+    text = str(payload.get("text") or "")
+    if len(text) > REDACT_MAX_CHARS:
+        return JSONResponse(
+            {"error": f"Send at most {REDACT_MAX_CHARS} characters."}, status_code=400
+        )
+    redacted, findings = redact(text)
+    counts: dict[str, int] = {}
+    for finding in findings:
+        counts[finding["kind"]] = counts.get(finding["kind"], 0) + 1
+    return JSONResponse(
+        {
+            "redacted": redacted,
+            "findings": [
+                {"kind": finding["kind"], "start": finding["span"][0], "end": finding["span"][1]}
+                for finding in findings
+            ],
+            "counts": counts,
+            "kinds": list(DEFAULT_KINDS),
+        }
+    )
 
 
 # ---------------------------------------------------------------------- source viewer

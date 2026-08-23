@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Keel · Documentation{% endblock %}
+{% block content %}
+<section class="intro">
+  <p class="crumbs"><a href="/">Overview</a> / Documentation</p>
+  <h1>Documentation</h1>
+  <p class="lede">
+    These are the Markdown documents from the repository, rendered here so a reader stays on the site.
+    Each one is the same file a reviewer reads in a diff, which is why the reference material and the
+    source never drift apart.
+  </p>
+</section>
+
+{% if docs %}
+<div class="cards">
+  {% for doc in docs %}
+  <article class="card">
+    <h3><a href="/docs/{{ doc.slug }}">{{ doc.title }}</a></h3>
+    <p>{{ doc.blurb }}</p>
+    <p class="card-foot"><span class="mono">{{ doc.source }}</span></p>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<p class="banner">
+  This build carries no documentation directory. Every document is in the repository at
+  <a href="{{ github }}/tree/main/docs">{{ github }}/tree/main/docs</a>.
+</p>
+{% endif %}
+
+<p class="actions inline">
+  <a class="button primary" href="/chat">Open the live demonstration</a>
+  <a class="button ghost" href="{{ github }}">Source on GitHub</a>
+</p>
+{% endblock %}

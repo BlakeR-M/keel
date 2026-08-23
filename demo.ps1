@@ -127,6 +127,6 @@ try {
 
 # --- 7. done ------------------------------------------------------------------------------------
 Write-Host ''
-Write-Host 'Keel is running: http://127.0.0.1:8400' -ForegroundColor Green
+Write-Host 'Keel is running: http://127.0.0.1:8400 (the appliance itself is at /chat)' -ForegroundColor Green
 Write-Host 'Try asking: How many quotes does a $20,000 purchase need at Northbank Council?'
 Write-Host 'Stop everything with: .\deploy\onprem\stop.ps1'

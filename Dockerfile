@@ -38,6 +38,8 @@ COPY pyproject.toml README.md LICENSE ./
 COPY keel ./keel
 COPY fixtures ./fixtures
 COPY scripts ./scripts
+# The site renders docs/ as pages (keel.web.docs), so the Markdown ships with the image.
+COPY docs ./docs
 COPY deploy/railway/entrypoint.sh /usr/local/bin/keel-entrypoint
 
 # Editable install keeps the web templates and static files served from /app/keel.

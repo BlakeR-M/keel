@@ -41,7 +41,7 @@ without a model server or a network connection; the integration tests in
 | Evaluation with a regression gate: a golden set runs through the production answer path, scores retrieval, refusals, leak strings and judged quality, writes HTML and JSON reports, and fails when a gated metric drops past its threshold | [`keel/evals/run.py`](keel/evals/run.py), [`keel/evals/metrics.py`](keel/evals/metrics.py), [`keel/evals/judge.py`](keel/evals/judge.py), [`keel/evals/report.py`](keel/evals/report.py) | [`tests/test_evals.py`](tests/test_evals.py)`::test_broken_retriever_zeroes_hit_at_3_refuses_everything_and_fails_the_gate`, `::test_must_not_include_catches_a_planted_override_string` |
 | Cloud profile without keys: `DefaultAzureCredential` and a user-assigned managed identity; the Bicep template disables local key auth on Azure OpenAI and Azure AI Search | [`keel/providers/azure.py`](keel/providers/azure.py), [`deploy/azure/main.bicep`](deploy/azure/main.bicep) | [`tests/test_azure_provider.py`](tests/test_azure_provider.py)`::TestCredentials::test_chat_uses_default_azure_credential_when_no_client_is_injected`, `::TestAzureSearchIndex::test_search_builds_acl_filter_and_maps_hits`; CI `bicep build` and `bicep lint` |
 
-The full suite is 585 tests across 18 files (`.venv\Scripts\python.exe -m pytest --collect-only -q`),
+The full suite is 597 tests across 19 files (`.venv\Scripts\python.exe -m pytest --collect-only -q`),
 of which 174 are adversarial cases from the 105 attack tests in `tests/redteam_*.py` (below). CI runs the unit and contract tests
 with `-m "not integration"`, ruff, `bicep build` and `bicep lint`, and the eval harness against fakes
 ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
@@ -223,9 +223,10 @@ the same harness with a 9B model on the GPU; promote this run as the baseline an
 - **Hosted demo on Railway** ([`deploy/railway/README.md`](deploy/railway/README.md)): two services,
   `keel-llm` (llama.cpp CPU server, Qwen2.5-3B-Instruct Q4_K_M fetched onto a volume) and `keel` (the
   root [`Dockerfile`](Dockerfile), `railway.json`), reachable at <https://keel.flow-through.com.au>.
-  It runs the fixture corpus with `KEEL_DEMO_IDENTITY=1`, which honours the chat page's user picker
-  beyond loopback so a visitor can compare `public` and `hr-officer`; that flag is for the hosted
-  demo of the fixture corpus and is never set for a real deployment ([`docs/web.md`](docs/web.md)).
+  It runs the fixture corpus with `KEEL_DEMO_IDENTITY=1`, which honours the demo user picker beyond
+  loopback so a visitor can compare `public` and `hr-officer` on the overview page; that flag is for
+  the hosted demo of the fixture corpus and is never set for a real deployment
+  ([`docs/web.md`](docs/web.md)).
 - **Azure** ([`deploy/azure/README.md`](deploy/azure/README.md), pointer page
   [`docs/deploy-azure.md`](docs/deploy-azure.md)): one Bicep template for Container Apps, Azure OpenAI
   deployments, Azure AI Search, Key Vault, a user-assigned managed identity, and private endpoints
@@ -257,7 +258,7 @@ it from a fresh shell.
 - The optional Gemini second judge (`GEMINI_API_KEY`) is wired and unit-tested with fakes
   (`tests/test_evals.py::test_two_judges_average_and_keep_both_raw`) and has not been exercised
   against the live endpoint.
-- Identity in the 0.1.x build is self-asserted on loopback: a user picker on the chat page, no
+- Identity in the 0.1.x build is self-asserted on loopback: a user picker on the demonstration page, no
   login, relying on the machine's own login. Beyond loopback the app ignores self-asserted identity
   and takes the user and tags only from a reverse proxy that proves itself with `KEEL_PROXY_TOKEN`
   ([`docs/web.md`](docs/web.md)); the proxy and its login are the operator's, and a built-in login is
@@ -280,11 +281,11 @@ it from a fresh shell.
 | [`keel/evals/`](keel/evals/run.py) | Golden set, judge, metrics, runner, HTML report |
 | [`keel/web/`](keel/web/app.py) | FastAPI app, view helpers, Jinja templates, one stylesheet and one script |
 | [`keel/cli.py`](keel/cli.py) | The `keel` command line (`python -m keel` runs the same app) |
-| [`tests/`](tests/conftest.py) | 585 tests including the three `redteam_*.py` files; [`tests/fakes.py`](tests/fakes.py) holds the `FakeLLM` the unit tests use |
+| [`tests/`](tests/conftest.py) | 597 tests including the three `redteam_*.py` files; [`tests/fakes.py`](tests/fakes.py) holds the `FakeLLM` the unit tests use |
 | [`fixtures/`](fixtures/corpus.yaml) | The original fixture corpus (`corpus/`, `corpus.yaml`) and the golden set ([`golden.yaml`](fixtures/golden.yaml)) |
 | [`scripts/`](scripts/fetch_demo_corpus.py) | `fetch_demo_corpus.py`, an optional CC BY 4.0 public corpus fetcher for a larger demo set |
 | [`deploy/onprem/`](deploy/onprem/run.ps1), [`deploy/azure/`](deploy/azure/README.md), [`deploy/aws/`](deploy/aws/README.md) | Native runners and Compose stack; Bicep, parameters and `deploy.ps1`; the AWS stub README |
-| [`docs/`](docs/README.md) | [`README.md`](docs/README.md) (index), [`architecture.md`](docs/architecture.md), [`cli.md`](docs/cli.md), [`web.md`](docs/web.md), [`evals.md`](docs/evals.md), [`onprem.md`](docs/onprem.md), [`deploy-azure.md`](docs/deploy-azure.md), [`threat-model.md`](docs/threat-model.md), [`security-review.md`](docs/security-review.md), [`demo-script.md`](docs/demo-script.md) |
+| [`docs/`](docs/README.md) | [`README.md`](docs/README.md) (index), [`tutorial.md`](docs/tutorial.md), [`architecture.md`](docs/architecture.md), [`cli.md`](docs/cli.md), [`web.md`](docs/web.md), [`evals.md`](docs/evals.md), [`onprem.md`](docs/onprem.md), [`deploy-azure.md`](docs/deploy-azure.md), [`threat-model.md`](docs/threat-model.md), [`security-review.md`](docs/security-review.md), [`demo-script.md`](docs/demo-script.md). The web app renders all of them at `/docs`. |
 | [`demo.ps1`](demo.ps1), [`Makefile`](Makefile), [`Dockerfile`](Dockerfile), [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | Fresh-clone demo entry points, the app image, CI |
 | [`CHANGELOG.md`](CHANGELOG.md), [`SECURITY.md`](SECURITY.md), [`LICENSE`](LICENSE) | Release notes, security policy, Apache 2.0 |
 

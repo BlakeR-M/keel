@@ -1,8 +1,14 @@
-# Web app: chat, source viewer, admin
+# Web app: overview, demonstration, documentation, admin
 
 `keel/web/app.py` exposes `app`, a FastAPI application with server-rendered Jinja2 pages, one small
 vanilla JavaScript file and one stylesheet. There is no build step: a reviewer runs it, opens a browser
 and reads the templates.
+
+The site has four surfaces. `/` is the overview, which is where a reader arriving from a link lands:
+what Keel is, three demonstrations that run the production code paths live, and the way into the
+reference material. `/chat` is the appliance itself. `/docs` renders the Markdown under `docs/` as
+pages of the site, so the reference material and the source never drift apart. `/admin` is the
+operator's surface and needs the token beyond loopback.
 
 ## Run
 
@@ -17,8 +23,9 @@ keel serve
 ```
 
 Then open <http://127.0.0.1:8400/>. `KEEL_DATA_DIR` picks the store; ingest the fixture corpus first
-(`keel ingest --manifest fixtures/corpus.yaml`, or `demo.ps1` does the whole thing) or the chat page
-refuses every question because there is nothing to retrieve.
+(`keel ingest --manifest fixtures/corpus.yaml`, or `demo.ps1` does the whole thing) or the
+demonstration page refuses every question because there is nothing to retrieve. The overview,
+the documentation and the air-gap and redaction demonstrations all work against an empty store.
 
 The app builds its `AppContext` (`keel.providers.factory.build_context()`) once, at startup in the
 lifespan handler, and keeps it on `app.state.ctx`. Servers that skip lifespan events get the same
@@ -29,7 +36,10 @@ and the app uses that instead. Import time touches neither the model nor the sto
 
 | Method and path | What it does |
 | --- | --- |
-| `GET /` | Chat page: question box, user select (`public` [public], `hr-officer` [public, hr]), free extra tags, mode toggle answer or agent, submit. Results render in place. |
+| `GET /` | Overview: what Keel is, the permission comparison, the air-gap probe, the redaction demonstration, how a question travels, the review summary, the control table, the deployment shapes and the documentation index. The comparison appears where the demo user picker is honoured, which is loopback and `KEEL_DEMO_IDENTITY=1`. |
+| `GET /chat` | The appliance: question box, user select (`public` [public], `hr-officer` [public, hr]), free extra tags, mode toggle answer or agent, submit. Results render in place. |
+| `GET /docs` | The documentation index, built from the Markdown files in `docs/`, in the reading order `keel.web.docs.READING_ORDER` names. |
+| `GET /docs/{slug}` | One document, rendered from `docs/{slug}.md`. A slug is lower-case words joined by hyphens, so it can name nothing outside the directory; the resolved path is checked against `docs/` as well, which closes a symlink pointing out. Sibling `.md` links become pages here and anything reaching out of `docs/` becomes a link into the repository on GitHub. |
 | `POST /ask` | Runs the question. Body is a form or JSON `{question, user_id, tags, mode}`. Replies with the HTML result partial when the request carries `X-Keel-Partial: 1` (what `keel.js` sends), JSON when `Accept: application/json`, otherwise the full chat page with the result in place (plain form post, JavaScript off). |
 | `POST /api/ask` | Same body, always JSON: `{request_id, mode, user, text, refused, citations[], retrieved[], prompt_tokens, output_tokens, latency_ms, data, error}`. |
 | `POST /api/agent` | Same body with mode forced to agent, always JSON: `{request_id, mode, user, text, refused, steps[], refused_tools[], prompt_tokens, output_tokens, latency_ms}`. Each step carries `tool`, `arguments`, `decision`, and either `result` or `queued_id`. |
@@ -42,11 +52,13 @@ and the app uses that instead. Import time touches neither the model nor the sto
 | `POST /admin/quarantine/{chunk_id}/release` | Clears the chunk's quarantine flag so retrieval may return it again and appends a ledger row of kind `quarantine` with payload `{chunk_id, action: "release", by}`. Both writes happen in one transaction. |
 | `POST /admin/ledger/verify` | Recomputes the whole hash chain and shows the `VerifyResult` on the admin page (JSON with `Accept: application/json`). |
 | `GET /admin/ledger/export` | The ledger as JSONL, `application/x-ndjson`, one row per line in the shape `keel.safety.ledger.verify_file()` reads offline. |
+| `POST /api/airgap-probe` | Body `{host}`. Attempts a connection to `host` at every guarded layer, in a child process started with `KEEL_AIRGAP=1` and this deployment's own `KEEL_AIRGAP_ALLOW_HOSTS`, so the allow list the report names is the one the appliance actually runs with, and returns `{host, guard, allow_hosts, allowed, attempts[], refused, layers, summary}`. Each attempt carries the layer, the guard that answered (`via`), the outcome and the refusal text. The guard is installed in the child rather than in the worker, so one visitor's probe cannot take the model connection away from another visitor's question. A host outside the allow list is unreachable, which is the property being demonstrated, and a host inside it is answered from the policy with no connection made. One probe per caller every three seconds; a faster caller gets 429, and a value that is not a bare host gets 400. |
+| `POST /api/redact` | Body `{text}`. Runs `keel.safety.pii.redact` and returns `{redacted, findings[], counts, kinds}`. A pure function of its argument: no store, no model, no network, and the text is neither kept nor logged. Text longer than 4000 characters gets 400. |
 | `GET /static/keel.css`, `GET /static/keel.js` | The stylesheet and the script. |
 
 ### Users and tags
 
-Identity on the chat page is self-asserted: the user select and the extra tags field decide which ACL
+Identity on the demonstration page is self-asserted: the user select and the extra tags field decide which ACL
 tags a request carries, and every retrieval, citation link and source view honours those tags. That
 is the right demo of permission filtering before generation, and the wrong thing to expose to the
 open internet as-is. Put the app behind an authenticating reverse proxy that maps real users to tags

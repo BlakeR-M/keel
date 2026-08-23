@@ -6,21 +6,49 @@ All notable changes to Keel. The format follows Keep a Changelog; versions follo
 
 ### Added
 
+- **The site leads with the security posture.** `GET /` is now an overview page rather than the
+  question box: what Keel is, three demonstrations that run the production code paths live, how a
+  question travels, the review summary with its open findings, a control table mapping every claim
+  to its code and its proving test, the three deployment shapes, a quickstart and the documentation
+  index. The appliance itself moved to `GET /chat` and is unchanged. A reader arriving cold from a
+  link reads the posture before any form (`landing.html`, `keel/web/app.py`).
+- **The permission comparison is the hero of the overview** rather than a button on the chat page.
+  One click asks the restricted pay-round question as `public` and as `hr-officer` through the same
+  `/ask` path a typed question takes, and the panel under it names where the filter runs, what the
+  refusal costs, and the second check at the generation boundary.
+- **The air gap is demonstrable, not only described** (`POST /api/airgap-probe`,
+  `keel/web/airgap_probe.py`): a visitor names a host and Keel attempts a real connection at every
+  guarded layer, reporting the layer, the guard that answered and the refusal text from the
+  exception itself. The attempts run in a child process started with `KEEL_AIRGAP=1`, so a worker's
+  own guard state is untouched and one visitor's probe cannot take the model connection away from
+  another visitor's question. A host outside the allow list is unreachable, which is the property
+  being shown; a host inside it is answered from the policy with no connection made. An address
+  reports that name resolution had nothing to look up rather than counting as a layer that let it
+  past. One probe per caller every three seconds.
+- **Redaction is demonstrable too** (`POST /api/redact`): text in, redacted text and the span of
+  every finding out, through the same `keel.safety.pii.redact` the pipeline uses. The sample text
+  makes the point that shape matching alone would miss, keeping a purchase order and an invoice
+  number intact beside a tax file number, a Medicare number and an ABN that pass their check digits.
+  A pure function: no store, no model, no network, and the text is neither kept nor logged.
+- **The documentation is part of the site** (`GET /docs`, `GET /docs/{slug}`, `keel/web/docs.py`):
+  the Markdown under `docs/` renders as pages, with sibling links kept on the site and links reaching
+  out of `docs/` pointed at the repository. A slug is lower-case words joined by hyphens and the
+  resolved path is checked against `docs/`, so a request path can name nothing outside it. The
+  Dockerfile now copies `docs/` into the image, with a test that says so.
+- **[`docs/tutorial.md`](docs/tutorial.md)**: install, load the fixture corpus, ask a question you are
+  not entitled to, run the agent and approve its write, verify and export the ledger, bring your own
+  documents, serve it, turn the network off, and measure the answers.
 - **Hosted demo** (`deploy/railway/`): a two-service Railway layout, `keel-llm` (llama.cpp CPU server
   fetching Qwen2.5-3B-Instruct Q4_K_M onto a volume) and `keel` (the root Dockerfile, now non-root
   with an entrypoint that honours `PORT`, data on `/data`, `railway.json` with a `/health` check).
-  `KEEL_DEMO_IDENTITY=1` honours the chat page's demo user picker beyond loopback (fixed tags per
+  `KEEL_DEMO_IDENTITY=1` honours the demo user picker beyond loopback (fixed tags per
   demo user, extra tags ignored, admin guard unchanged) with a banner naming the demo;
   `KEEL_DEMO_READONLY=1` declares the read-only posture (a test pins every POST route);
   `KEEL_BOOTSTRAP_CORPUS` ingests a manifest into an empty store at startup (`keel/bootstrap.py`);
   `KEEL_LOCAL_LLM_TIMEOUT` reaches the model client. Both demo flags are for the hosted demo of the
   fixture corpus and never for a real deployment.
-- **One-click permission compare on the hosted demo**: the chat banner carries an "Ask as both
-  users" button that fires the restricted pay-round question as `public` and as `hr-officer`
-  through the same `/ask` partial path a typed question takes, and renders the refusal and the
-  cited answer side by side (`chat.html`, `keel.js`, `keel.css`; asserted in the demo-posture
-  test). Demo-gated, so real deployments never render it.
-- **HEAD on `/` and `/health`** for link checkers and unfurl bots that read a 405 as a dead page;
+- **One-click permission compare**, since moved to the overview page and covered above.
+- **HEAD on every page a link can point at** (`/`, `/chat`, `/docs`, `/docs/{slug}`, `/health`) for link checkers and unfurl bots that read a 405 as a dead page;
   **meta description and Open Graph tags** in `base.html` so a pasted link unfurls with a title
   and a summary.
 - **Health as a page for people, JSON for machines**: a browser following the nav link gets a

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Keel · {{ doc.title }}{% endblock %}
+{% block content %}
+<section class="intro">
+  <p class="crumbs"><a href="/">Overview</a> / <a href="/docs">Documentation</a> / {{ doc.title }}</p>
+</section>
+
+{# `safe`: this HTML is rendered from the repository's own Markdown files by keel.web.docs,
+   which rewrites their links. No request value reaches it. #}
+<article class="prose">
+{{ doc.html | safe }}
+</article>
+
+<nav class="doc-foot" aria-label="Document footer">
+  <p>
+    This page renders <span class="mono">{{ doc.source }}</span> from the repository.
+    <a href="{{ github }}/blob/main/{{ doc.source }}">Read it on GitHub</a>.
+  </p>
+  {% if prev or next %}
+  <p class="doc-nav">
+    {% if prev %}<a href="/docs/{{ prev.slug }}">Previous: {{ prev.title }}</a>{% endif %}
+    {% if next %}<a href="/docs/{{ next.slug }}">Next: {{ next.title }}</a>{% endif %}
+  </p>
+  {% endif %}
+  <p class="actions inline">
+    <a class="button" href="/docs">All documentation</a>
+    <a class="button ghost" href="/">Overview</a>
+  </p>
+</nav>
+{% endblock %}
