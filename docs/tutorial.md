@@ -97,8 +97,8 @@ is not enough to put a restricted chunk in front of the model.
 
 ## 4. Run the agent, and approve its write
 
-Agent mode lets the model call typed tools under a policy that is written down rather than implied:
-document search, read-only SQL, a bounded calculator, and ticket creation.
+Agent mode lets the model call five typed tools under a policy that is written down rather than
+implied: `search_docs`, `calculator`, `sql_readonly`, `http_get` and `create_ticket`.
 
 ```bash
 keel agent "Create a support ticket titled 'Printer down' saying the level 2 printer is jammed."
@@ -119,6 +119,10 @@ after someone approves an action and the approval turns into a recorded refusal 
 The read-only SQL tool is worth trying as well. It runs under a SQLite authorizer with statement and
 result-size caps, so it can read and cannot write, and it cannot be talked into allocating its way
 through the machine's memory.
+
+`http_get` is the one tool that reaches outside the box, so it is the one to look at closely. It is
+bound to a host allowlist, an empty allowlist refuses every host, and with `KEEL_AIRGAP=1` it refuses
+before any connection is attempted at all. Section 8 turns that on.
 
 ## 5. Verify the audit trail
 

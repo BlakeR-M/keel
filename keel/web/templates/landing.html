@@ -13,7 +13,7 @@
     request lands in a hash-chained ledger.
   </p>
   <ul class="stat-strip">
-    <li><span class="stat-n">597</span><span class="stat-k">tests, 19 files</span></li>
+    <li><span class="stat-n">602</span><span class="stat-k">tests, 19 files</span></li>
     <li><span class="stat-n">105</span><span class="stat-k">attack tests</span></li>
     <li><span class="stat-n">27</span><span class="stat-k">review findings</span></li>
     <li><span class="stat-n">5</span><span class="stat-k">guarded egress layers</span></li>
@@ -227,10 +227,10 @@
       <div>
         <h3>Retrieve, filtered inside the query</h3>
         <p>
-          BM25 and a vector index run in parallel, each applying the entitlement filter as part of its
-          own query. The two result sets are fused, then a cross-encoder reranks what survived. The
-          filter runs before the fusion and before the reranker, so an unentitled chunk is never a
-          candidate for either.
+          A BM25 search and a vector search each run with the entitlement filter written into their
+          own query, so a chunk the caller may not read is never in either result set. Reciprocal
+          rank fusion combines the two, a cross-encoder reranks what survived, and the answer engine
+          checks entitlement once more before anything reaches the model.
         </p>
       </div>
     </li>
@@ -250,11 +250,12 @@
       <div>
         <h3>Act, under a written policy, behind a person</h3>
         <p>
-          Agent mode calls typed tools: document search, read-only SQL, a bounded calculator, ticket
-          creation. The policy is written down rather than implied, read-only SQL runs under an
-          authorizer with a size cap, and every write action waits in an approval queue. The policy is
-          re-checked at the moment of execution, so an approval cannot outlive the policy that
-          permitted it.
+          Agent mode calls five typed tools: document search, a bounded calculator, read-only SQL,
+          an allowlisted HTTP GET, and ticket creation. The policy is written down rather than
+          implied, read-only SQL runs under a SQLite authorizer with a size cap, HTTP GET reaches
+          only hosts you name and refuses before connecting whenever air-gap mode is on, and every
+          write action waits in an approval queue. The policy is re-checked at the moment of
+          execution, so an approval cannot outlive the policy that permitted it.
         </p>
       </div>
     </li>
@@ -283,9 +284,10 @@
   <h2>The security review, published with its open findings</h2>
   <p class="lede">
     Before Keel was first published, three independent reviewers were pointed at the security-bearing
-    paths with one instruction: break them. The result is 105 attack tests, 27 findings, and every
-    finding of medium severity or above fixed in the same release. The tests live in the repository
-    and run in the default suite.
+    paths with one instruction: break them. The result is 105 attack tests and 27 findings.
+    Twenty-five are fixed in the same release, each with the test that proves it. Two stay open on
+    purpose, each carrying the control that covers it. The tests live in the repository and run in
+    the default suite.
   </p>
   <ul class="scoreboard">
     <li><span class="score-n">27</span><span class="score-k">findings</span></li>

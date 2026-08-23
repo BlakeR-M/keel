@@ -10,7 +10,7 @@
     <p><strong>What it is.</strong> A retrieval and agent appliance that runs where the documents live: one machine on premise, or a client's own Azure tenancy. This demo is the on-premise build with a small CPU model.</p>
     <p><strong>What it is for.</strong> A team asks questions of its own documents and gets answers citing the exact chunk they came from. The permission filter sits inside retrieval, so each person sees what their role allows and the model sees only entitled chunks.</p>
     <p><strong>How it is built.</strong> Hybrid BM25 and vector retrieval, fused and reranked, with the permission filter applied before fusion. A local model generates, and every request lands in a hash-chained ledger the admin page can verify.</p>
-    <p><strong>How it runs internal operations.</strong> Agent mode calls typed tools under a written policy: document search, read-only SQL, a calculator, ticket creation. Write actions wait in an approval queue for a person, and every step is audited.</p>
+    <p><strong>How it runs internal operations.</strong> Agent mode calls five typed tools under a written policy: document search, a calculator, read-only SQL, an allowlisted HTTP GET that refuses outright under air-gap, and ticket creation. Write actions wait in an approval queue for a person, and every step is audited.</p>
     <form method="dialog"><button class="primary">Into the demo</button></form>
   </dialog>
   <p class="banner" id="demo-banner">

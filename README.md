@@ -10,8 +10,10 @@ policy, write actions wait in an approval queue for a person, every request land
 ledger and an inference log, and a golden-set evaluation with a regression gate ships in the same
 repository, so quality is measured rather than asserted. Before first publish the security-bearing
 paths were adversarially reviewed: 105 attack tests across access control, tool policy, ledger
-integrity, injection screening and the air gap, 27 findings, every medium-or-higher fixed in the
-same release (the full table is in [`docs/security-review.md`](docs/security-review.md)). It exists
+integrity, injection screening and the air gap, and 27 findings. Twenty-five are fixed in the same
+release, each with the test that proves it. Two stay open on purpose, one medium and one low, each
+carrying the control that covers it and a strict expected-failure marker that says so the day it
+starts passing (the full table is in [`docs/security-review.md`](docs/security-review.md)). It exists
 because small Australian businesses and public bodies want to ask questions of their own documents
 while the documents, and the questions, stay in the building.
 
@@ -41,7 +43,7 @@ without a model server or a network connection; the integration tests in
 | Evaluation with a regression gate: a golden set runs through the production answer path, scores retrieval, refusals, leak strings and judged quality, writes HTML and JSON reports, and fails when a gated metric drops past its threshold | [`keel/evals/run.py`](keel/evals/run.py), [`keel/evals/metrics.py`](keel/evals/metrics.py), [`keel/evals/judge.py`](keel/evals/judge.py), [`keel/evals/report.py`](keel/evals/report.py) | [`tests/test_evals.py`](tests/test_evals.py)`::test_broken_retriever_zeroes_hit_at_3_refuses_everything_and_fails_the_gate`, `::test_must_not_include_catches_a_planted_override_string` |
 | Cloud profile without keys: `DefaultAzureCredential` and a user-assigned managed identity; the Bicep template disables local key auth on Azure OpenAI and Azure AI Search | [`keel/providers/azure.py`](keel/providers/azure.py), [`deploy/azure/main.bicep`](deploy/azure/main.bicep) | [`tests/test_azure_provider.py`](tests/test_azure_provider.py)`::TestCredentials::test_chat_uses_default_azure_credential_when_no_client_is_injected`, `::TestAzureSearchIndex::test_search_builds_acl_filter_and_maps_hits`; CI `bicep build` and `bicep lint` |
 
-The full suite is 597 tests across 19 files (`.venv\Scripts\python.exe -m pytest --collect-only -q`),
+The full suite is 602 tests across 19 files (`.venv\Scripts\python.exe -m pytest --collect-only -q`),
 of which 174 are adversarial cases from the 105 attack tests in `tests/redteam_*.py` (below). CI runs the unit and contract tests
 with `-m "not integration"`, ruff, `bicep build` and `bicep lint`, and the eval harness against fakes
 ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
@@ -281,7 +283,7 @@ it from a fresh shell.
 | [`keel/evals/`](keel/evals/run.py) | Golden set, judge, metrics, runner, HTML report |
 | [`keel/web/`](keel/web/app.py) | FastAPI app, view helpers, Jinja templates, one stylesheet and one script |
 | [`keel/cli.py`](keel/cli.py) | The `keel` command line (`python -m keel` runs the same app) |
-| [`tests/`](tests/conftest.py) | 597 tests including the three `redteam_*.py` files; [`tests/fakes.py`](tests/fakes.py) holds the `FakeLLM` the unit tests use |
+| [`tests/`](tests/conftest.py) | 602 tests including the three `redteam_*.py` files; [`tests/fakes.py`](tests/fakes.py) holds the `FakeLLM` the unit tests use |
 | [`fixtures/`](fixtures/corpus.yaml) | The original fixture corpus (`corpus/`, `corpus.yaml`) and the golden set ([`golden.yaml`](fixtures/golden.yaml)) |
 | [`scripts/`](scripts/fetch_demo_corpus.py) | `fetch_demo_corpus.py`, an optional CC BY 4.0 public corpus fetcher for a larger demo set |
 | [`deploy/onprem/`](deploy/onprem/run.ps1), [`deploy/azure/`](deploy/azure/README.md), [`deploy/aws/`](deploy/aws/README.md) | Native runners and Compose stack; Bicep, parameters and `deploy.ps1`; the AWS stub README |
