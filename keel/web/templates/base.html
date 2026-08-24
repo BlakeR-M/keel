@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0f1317">
-<meta name="description" content="Keel is a sovereign retrieval and agent appliance: cited answers from your own documents, permission filtering before generation, air-gap mode that refuses egress at five layers, write actions behind human approval, and a hash-chained audit ledger. Everything stays in the building.">
+<meta name="description" content="Keel is a retrieval and agent appliance that runs inside your own network. Answers cite the passage they came from, entitlement filtering runs inside retrieval, air-gap mode refuses egress at five layers, and every request appends to a hash-chained ledger.">
 <meta property="og:title" content="Keel">
 <meta property="og:description" content="Cited answers from your own documents, with permission filtering before generation and a hash-chained audit ledger. Everything stays in the building.">
 <meta property="og:type" content="website">
@@ -29,7 +29,6 @@
       <a href="/chat"{% if active == 'chat' %} class="on" aria-current="page"{% endif %}>Demo</a>
       <a href="/docs"{% if active == 'docs' %} class="on" aria-current="page"{% endif %}>Docs</a>
       <a href="/health"{% if active == 'health' %} class="on" aria-current="page"{% endif %}>Health</a>
-      <a href="/admin"{% if active == 'admin' %} class="on" aria-current="page"{% endif %}>Admin</a>
     </nav>
     {% if profile %}<span class="pill" title="Deploy profile">{{ profile }}</span>{% endif %}
   </div>

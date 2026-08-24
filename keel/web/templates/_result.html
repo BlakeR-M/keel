@@ -37,7 +37,7 @@
             <span class="tag state-{{ step.state }}">{{ step.state }}</span>
           </div>
           {% if step.state == 'queued' %}
-          <p class="step-out">{{ step.outcome }} · <a href="/admin#approvals">decide on the admin page</a></p>
+          <p class="step-out">{{ step.outcome }} · held in the approval queue for an operator</p>
           {% elif step.state == 'refused' %}
           <p class="step-out">{{ step.outcome }}</p>
           {% else %}
@@ -56,6 +56,6 @@
     <span>{{ r.latency_ms|thousands }} ms</span>
     <span>{{ r.prompt_tokens|thousands }} prompt tokens</span>
     <span>{{ r.output_tokens|thousands }} output tokens</span>
-    <a href="/admin/request/{{ r.request_id }}" title="Open this request in the admin log">request {{ r.request_id[:8] }}</a>
+    <span title="This request's id in the ledger and the inference log">request {{ r.request_id[:8] }}</span>
   </footer>
 </article>

@@ -19,7 +19,7 @@
   {% if chunk.heading %}<dt>Heading</dt><dd>{{ chunk.heading }}</dd>{% endif %}
   <dt>Viewed as</dt><dd>{{ user.user_id }} · {{ user.tags|join(', ') }}</dd>
   {% if chunk.quarantined %}
-  <dt>Quarantine</dt><dd>{{ chunk.quarantine_reason or 'flagged by the injection screen' }}. Retrieval leaves this chunk out until an admin releases it on the <a href="/admin#quarantine">admin page</a>.</dd>
+  <dt>Quarantine</dt><dd>{{ chunk.quarantine_reason or 'flagged by the injection screen' }}. Retrieval leaves this passage out until an operator releases it from the quarantine list.</dd>
   {% elif chunk.quarantine_reason %}
   <dt>History</dt><dd>Once quarantined ({{ chunk.quarantine_reason }}), released by an admin. See the ledger.</dd>
   {% endif %}

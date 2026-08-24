@@ -243,7 +243,7 @@ def test_agent_steps_render_as_cards_with_tool_and_state() -> None:
     assert html.count('class="step step-') == 2
     assert 'class="tool">calculator<' in html and 'class="tag state-ran">ran<' in html
     assert 'class="tag state-queued">queued<' in html
-    assert "decide on the admin page" in html
+    assert "held in the approval queue for an operator" in html
 
 
 # ---------------------------------------------------------------------- stylesheet and script

@@ -63,9 +63,13 @@ def _clear_probe_limit() -> Iterator[None]:
 def test_overview_leads_with_the_security_posture_rather_than_the_question_box(
     client: TestClient,
 ) -> None:
-    """A stranger following a link reads what Keel is and what it refuses, before any form."""
+    """A stranger following a link reads what Keel is and what it refuses, before any form.
+
+    The heading states what Keel is rather than instructing the reader to do something. This page is
+    a reference for someone deciding whether to look further, so the register stays descriptive.
+    """
     html = client.get("/").text
-    assert "Ask your own documents" in html
+    assert "Keel is a retrieval and agent appliance" in html
     for claim in (
         "sovereign",
         "air-gap",
@@ -96,8 +100,22 @@ def test_overview_lists_the_documentation_it_can_render(client: TestClient) -> N
 
 def test_navigation_reaches_every_public_page(client: TestClient) -> None:
     html = client.get("/").text
-    for href in ('href="/"', 'href="/chat"', 'href="/docs"', 'href="/health"', 'href="/admin"'):
+    for href in ('href="/"', 'href="/chat"', 'href="/docs"', 'href="/health"'):
         assert href in html, href
+
+
+def test_no_page_a_visitor_can_reach_links_to_the_operator_surface() -> None:
+    """The admin routes need a token, so a link to them from a public page is a wall a reader walks
+    into. The operator surface stays reachable by URL for whoever runs the appliance, and unlinked
+    from everything a visitor sees."""
+    templates = Path(__file__).resolve().parent.parent / "keel" / "web" / "templates"
+    operator_pages = {"admin.html", "admin_request.html"}
+    offenders = [
+        path.name
+        for path in sorted(templates.glob("*.html"))
+        if path.name not in operator_pages and '"/admin' in path.read_text(encoding="utf-8")
+    ]
+    assert offenders == [], f"these visitor-facing templates link to /admin: {offenders}"
 
 
 # ---------------------------------------------------------------------- documentation pages

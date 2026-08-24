@@ -319,7 +319,7 @@ summary:hover { color: var(--text); }
 /* Hero */
 .hero { padding: var(--s7) 0 var(--s6); border-bottom: 1px solid var(--border); margin-bottom: var(--s6); }
 .eyebrow, .kicker { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); margin: 0 0 var(--s2); font-weight: 600; }
-.hero h1 { font-size: clamp(1.8rem, 1.1rem + 2.6vw, 2.9rem); line-height: 1.12; letter-spacing: -0.02em; max-width: 20ch; margin-bottom: var(--s4); }
+.hero h1 { font-size: clamp(1.5rem, 1.05rem + 1.8vw, 2.25rem); line-height: 1.2; letter-spacing: -0.015em; max-width: 30ch; margin-bottom: var(--s4); }
 .hero-lede { color: var(--text); font-size: 1.05rem; max-width: 68ch; margin-bottom: var(--s5); }
 .hero-note { color: var(--muted); font-size: 0.9rem; max-width: 70ch; margin-top: var(--s5); }
 .hero-note strong { color: var(--text); }
