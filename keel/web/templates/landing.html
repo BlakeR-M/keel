@@ -18,7 +18,7 @@
     approve them. Every request appends to a hash-chained ledger that verifies from an exported file.
   </p>
   <ul class="stat-strip">
-    <li><span class="stat-n">603</span><span class="stat-k">tests, 19 files</span></li>
+    <li><span class="stat-n">604</span><span class="stat-k">tests, 19 files</span></li>
     <li><span class="stat-n">105</span><span class="stat-k">attack tests</span></li>
     <li><span class="stat-n">27</span><span class="stat-k">review findings</span></li>
     <li><span class="stat-n">5</span><span class="stat-k">guarded egress layers</span></li>
@@ -291,11 +291,12 @@
 <section class="block" id="review">
   <h2>The adversarial security review</h2>
   <p class="lede">
-    Before Keel was first published, three independent reviewers were pointed at the security-bearing
-    paths with one instruction: break them. The result is 105 attack tests and 27 findings.
-    Twenty-five are fixed in the same release, each with the test that proves it. Two stay open by
-    choice, each carrying the control that covers it. The tests live in the repository and run in the
-    default suite.
+    Before Keel was first published the security-bearing paths were worked over adversarially, attack
+    by attack, across access control, tool policy, ledger integrity, injection screening and the air
+    gap. That produced 105 attack tests and 27 findings. Twenty-five are fixed in the same release,
+    each with the test that proves it. Two stay open by choice, each carrying the control that covers
+    it. Every attack was written as a test that stays in the default suite, so the review keeps
+    running rather than expiring on the day it finished.
   </p>
   <ul class="scoreboard">
     <li><span class="score-n">27</span><span class="score-k">findings</span></li>

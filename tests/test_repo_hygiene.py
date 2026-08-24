@@ -211,3 +211,27 @@ def test_pages_that_list_the_agent_tools_name_all_of_them():
         if "typed tool" not in text:
             continue
         assert "http" in text, f"{path.name} lists the agent tools without naming http_get"
+
+
+def test_no_page_claims_a_number_of_human_reviewers():
+    """The published pages describe the review method, which the repository evidences, rather than a
+    headcount of people, which it does not.
+
+    An earlier draft said three independent reviewers had been pointed at the security-bearing paths.
+    Nothing here supports that, and on a repository whose argument is that its claims are checkable,
+    an unverifiable one about provenance costs more than it earns.
+    """
+    claim = re.compile(
+        r"\b(one|two|three|four|five|\d+)\s+(independent\s+|external\s+|third[- ]party\s+)?"
+        r"(reviewers?|auditors?|assessors?|pen[- ]?testers?)\b",
+        re.IGNORECASE,
+    )
+    pages = [REPO_ROOT / "README.md", REPO_ROOT / "SECURITY.md", REPO_ROOT / "CHANGELOG.md"]
+    pages += sorted((REPO_ROOT / "docs").glob("*.md"))
+    pages += sorted((REPO_ROOT / "keel" / "web" / "templates").glob("*.html"))
+    offenders = [
+        f"{page.name}: {claim.search(page.read_text(encoding='utf-8')).group(0)}"
+        for page in pages
+        if claim.search(page.read_text(encoding="utf-8"))
+    ]
+    assert offenders == [], f"unverifiable reviewer headcount on: {offenders}"

@@ -1,8 +1,10 @@
 # Adversarial security review
 
-Before Keel was first published, three independent reviewers were pointed at the security-bearing
-paths with one instruction: break them. This page is the result, with the severity of each finding
-and the test that now proves the fix.
+Before Keel was first published the security-bearing paths were worked over adversarially, attack by
+attack, across access control, tool policy, ledger integrity, injection screening and the air gap.
+Every attack was written as a test that stays in the suite, so the review keeps running rather than
+expiring on the day it finished. This page is the result, with the severity of each finding and the
+test that now proves the fix.
 
 Every attack is a test in the three red-team files, which `pytest` collects by default:
 
