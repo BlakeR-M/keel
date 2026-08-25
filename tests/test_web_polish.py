@@ -268,3 +268,13 @@ def test_script_swaps_partials_and_shows_a_working_state() -> None:
     assert '"X-Keel-Partial": "1"' in js
     assert 'aria-busy="true"' in js and 'class="working"' in js
     assert "requestSubmit" in js and "ctrlKey" in js
+
+
+def test_the_header_fits_a_narrow_phone():
+    """The header is one nowrap row of brand, nav and profile pill. On a 375 px screen those three
+    overflowed the viewport and scrolled the whole page sideways. The pill gives way there, since the
+    footer names the profile on every page regardless."""
+    css = read(STATIC_DIR / "keel.css")
+    narrow = re.search(r"@media \(max-width: 560px\) \{(.+?)\n\}", css, re.S)
+    assert narrow, "the stylesheet should carry a narrow-phone rule for the header"
+    assert ".bar .pill { display: none; }" in narrow.group(1)

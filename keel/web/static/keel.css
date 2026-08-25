@@ -422,6 +422,15 @@ table.grid td.ref { font-family: var(--mono); font-size: 0.82em; overflow-wrap: 
 /* Footer links */
 .foot-links { display: inline-flex; flex-wrap: wrap; gap: var(--s2) var(--s4); }
 
+@media (max-width: 560px) {
+  /* The header bar is one nowrap row: brand, nav, profile pill. On a narrow phone those three add up
+     past the viewport and the whole page scrolls sideways. The pill is the one that can go, because
+     the footer names the profile on every page anyway. */
+  .bar .pill { display: none; }
+  .bar { gap: var(--s3); }
+  .bar nav { gap: var(--s3); min-width: 0; }
+}
+
 @media (max-width: 760px) {
   .hero { padding-top: var(--s5); }
   .pipeline li { grid-template-columns: 1fr; gap: var(--s2); }
