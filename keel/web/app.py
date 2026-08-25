@@ -29,6 +29,7 @@ from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
@@ -42,6 +43,7 @@ from keel.agent.tools import ToolContext
 from keel.answer.types import User
 from keel.bootstrap import ensure_demo_corpus
 from keel.db import transaction
+from keel.documents import corpus_tags, list_documents
 from keel.providers.factory import AppContext, build_context
 from keel.providers.local_index import parse_tags as parse_chunk_tags
 from keel.safety.ledger import VerifyResult
@@ -225,8 +227,11 @@ def wants_partial(request: Request) -> bool:
 
 
 async def read_payload(request: Request) -> dict[str, Any]:
-    """The request body as one dict, from a JSON object or a form. Form `tags` fields collect into
-    a list; an absent body yields an empty dict."""
+    """The request body as one dict, from a JSON object or a form.
+
+    Every form field is carried through, because a hardcoded list of names silently drops whatever a
+    newer route adds. Repeated `tags` fields collect into a list; an absent body yields an empty dict.
+    """
     content_type = request.headers.get("content-type", "").lower()
     if "application/json" in content_type:
         try:
@@ -235,9 +240,7 @@ async def read_payload(request: Request) -> dict[str, Any]:
             return {}
         return data if isinstance(data, dict) else {}
     form = await request.form()
-    payload: dict[str, Any] = {
-        key: form.get(key) for key in ("question", "user_id", "mode", "by") if key in form
-    }
+    payload: dict[str, Any] = {key: form.get(key) for key in form}
     if "tags" in form:
         payload["tags"] = list(form.getlist("tags"))
     return payload
@@ -442,6 +445,8 @@ def admin_context(
             "min_relevance": ctx.settings.min_relevance,
             "guarded": not is_loopback(ctx.settings.host),
         },
+        "documents": [row.to_dict() for row in list_documents(ctx.conn)],
+        "corpus_tags": corpus_tags(ctx.conn),
         **upload_context(),
     }
 
@@ -1069,6 +1074,158 @@ if web_ingest_enabled():
             return JSONResponse(body)
         return redirect_admin("#documents")
 
+
+    @admin.post("/documents/{document_id}/retag")
+    async def admin_retag(request: Request, document_id: int) -> Response:
+        """Change a document's access tags, and its chunks' tags with it.
+
+        Mistagging a sensitive document is the ordinary mistake on an appliance like this, and until
+        this route existed the only remedy was editing SQLite. Both tables move inside one
+        transaction with a ledger row, so the correction is audited like the ingest was.
+        """
+        from keel.documents import retag_document
+
+        payload = await read_payload(request)
+        ctx = get_ctx(request)
+        try:
+            updated = await run_in_threadpool(
+                retag_document,
+                ctx.conn,
+                ctx.index,
+                document_id,
+                payload.get("tags", ""),
+                by=actor_from(payload),
+                ledger=ctx.ledger,
+            )
+        except LookupError:
+            return error_response(request, 404, f"No document {document_id} in this store.", partial_ok=False)
+        if wants_json(request):
+            return JSONResponse(updated.to_dict())
+        return redirect_admin("#documents")
+
+    @admin.post("/documents/{document_id}/remove")
+    async def admin_remove_document(request: Request, document_id: int) -> Response:
+        """Take a document out of the store, with its chunks, full-text entries and embeddings.
+
+        The ledger row is written before the rows go, inside the same transaction, so a removal is
+        recorded even though the thing it describes is gone. See `keel.documents.remove_document`
+        for why one DELETE is enough to leave nothing retrievable behind.
+        """
+        from keel.documents import remove_document
+
+        payload = await read_payload(request)
+        ctx = get_ctx(request)
+        try:
+            removed = await run_in_threadpool(
+                remove_document,
+                ctx.conn,
+                ctx.index,
+                document_id,
+                by=actor_from(payload),
+                ledger=ctx.ledger,
+            )
+        except LookupError:
+            return error_response(request, 404, f"No document {document_id} in this store.", partial_ok=False)
+        if wants_json(request):
+            return JSONResponse(removed.to_dict())
+        return redirect_admin("#documents")
+
+    @admin.post("/connection")
+    async def admin_connection_switch(request: Request) -> Response:
+        """Point Keel at a different model server, from the ones answering on this machine.
+
+        Loopback only, and deliberately so. A form that accepts any endpoint is an exfiltration
+        lever: whoever reaches it could point the model at a host they control and read every
+        question and every retrieved passage. Restricting the choice to what is already listening on
+        this machine keeps the convenience and removes the lever.
+
+        The running providers are updated in place so the change takes effect on the next question,
+        and `.env` is written so it survives a restart.
+        """
+        from keel.onboarding import merge_env, probe_endpoint
+        from keel.providers.local_llm import OpenAICompatibleLLM
+        from keel.web.views import is_loopback
+
+        payload = await read_payload(request)
+        base_url = str(payload.get("base_url") or "").strip()
+        model = str(payload.get("model") or "").strip()
+        host = urlsplit(base_url).hostname or ""
+        if not base_url or not model:
+            return error_response(request, 400, "Name an endpoint and a model.", partial_ok=False)
+        if not is_loopback(host):
+            return error_response(
+                request,
+                400,
+                "Keel switches only to a model server on this machine. An endpoint elsewhere is a "
+                "deployment decision, set through KEEL_LOCAL_LLM_BASE_URL where it can be reviewed.",
+                partial_ok=False,
+            )
+        reachable, models, detail = await run_in_threadpool(probe_endpoint, base_url)
+        if not reachable:
+            return error_response(request, 400, f"{base_url} is out of reach: {detail}", partial_ok=False)
+        if models and model not in models:
+            listed = ", ".join(models[:6])
+            return error_response(
+                request, 400, f"{base_url} serves {listed}, and not {model}.", partial_ok=False
+            )
+
+        ctx = get_ctx(request)
+        swapped = OpenAICompatibleLLM(
+            base_url=base_url, model=model, api_key=ctx.settings.local_llm_api_key,
+            timeout=ctx.settings.local_llm_timeout,
+        )
+        # The engine and the loop each hold their own reference from build time, so all three move
+        # together. A request already mid-call finishes on the provider it started with.
+        ctx.llm = swapped
+        ctx.answer_engine.llm = swapped
+        ctx.agent_loop.llm = swapped
+        ctx.settings.local_llm_base_url = base_url
+        ctx.settings.local_llm_model = model
+        values = {"KEEL_LOCAL_LLM_BASE_URL": base_url, "KEEL_LOCAL_LLM_MODEL": model}
+        await run_in_threadpool(merge_env, Path(".env"), values)
+        log.info("model switched to %s at %s", model, base_url)
+        if wants_json(request):
+            return JSONResponse({"base_url": base_url, "model": model, "applied": True})
+        return RedirectResponse("/admin/connection", status_code=303)
+
+
+@admin.get("/connection", response_class=HTMLResponse)
+def admin_connection(request: Request) -> HTMLResponse:
+    """What Keel is pointed at, whether it answers, and what to do when it does not.
+
+    The same checks `keel doctor` runs, on a page, for whoever deployed this with `docker compose up`
+    and has no terminal on the box. Probing costs a couple of seconds, which is why it sits here
+    rather than on every admin page load.
+    """
+    from keel.onboarding import discover, run_checks
+    from keel.web.views import is_loopback
+
+    ctx = get_ctx(request)
+    checks = run_checks(ctx.settings)
+    found = discover() if ctx.profile == "local" else []
+    return render(
+        "connection.html",
+        active="admin",
+        profile=ctx.profile,
+        checks=[
+            {"name": c.name, "ok": c.ok, "detail": c.detail, "fix": c.fix, "mark": c.mark} for c in checks
+        ],
+        wanting=sum(1 for c in checks if not c.ok),
+        discovered=[
+            {"name": d.name, "base_url": d.base_url, "models": list(d.models)}
+            for d in found
+            if is_loopback(urlsplit(d.base_url).hostname or "")
+        ],
+        current={
+            "profile": ctx.profile,
+            "base_url": ctx.settings.local_llm_base_url,
+            "model": ctx.settings.local_llm_model,
+            "azure_openai": ctx.settings.azure_openai_endpoint,
+            "azure_search": ctx.settings.azure_search_endpoint,
+            "chat_deployment": ctx.settings.azure_openai_chat_deployment,
+        },
+        can_switch=web_ingest_enabled() and ctx.profile == "local",
+    )
 
 app.include_router(admin)
 

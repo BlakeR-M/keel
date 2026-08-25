@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Keel · Connection{% endblock %}
+{% block content %}
+<section class="intro">
+  <p class="crumbs"><a href="/admin">Admin</a> / Connection</p>
+  <h1>Connection</h1>
+  <p class="lede">
+    What this appliance is pointed at and whether it answers. These are the checks
+    <span class="mono">keel doctor</span> runs, on a page, for whoever deployed Keel with a container
+    and has no terminal on the box.
+  </p>
+</section>
+
+<section class="block" id="current">
+  <h2>Configured</h2>
+  <ul class="facts">
+    <li><span class="k">profile</span><span class="v">{{ current.profile }}</span></li>
+    {% if current.profile == 'azure' %}
+    <li><span class="k">Azure OpenAI</span><span class="v">{{ current.azure_openai or 'unset' }}</span></li>
+    <li><span class="k">chat deployment</span><span class="v">{{ current.chat_deployment or 'unset' }}</span></li>
+    <li><span class="k">Azure AI Search</span><span class="v">{{ current.azure_search or 'unset' }}</span></li>
+    {% else %}
+    <li><span class="k">endpoint</span><span class="v">{{ current.base_url }}</span></li>
+    <li><span class="k">model</span><span class="v">{{ current.model }}</span></li>
+    {% endif %}
+  </ul>
+</section>
+
+<section class="block" id="checks">
+  <h2>Checks</h2>
+  <div class="table-wrap">
+  <table class="grid">
+    <thead><tr><th>Check</th><th>State</th><th>What it found</th></tr></thead>
+    <tbody>
+    {% for check in checks %}
+      <tr>
+        <td class="mono">{{ check.name }}</td>
+        <td><span class="tag {{ 'state-approved' if check.ok else 'state-refused' }}">{{ check.mark }}</span></td>
+        <td class="q">{{ check.detail }}{% if check.fix %}<br><span class="muted">{{ check.fix }}</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if wanting %}
+  <p class="hint">{{ wanting }} check{{ '' if wanting == 1 else 's' }} wanting attention. Each line above names what to do.</p>
+  {% else %}
+  <p class="hint notice">Everything a request needs is in place.</p>
+  {% endif %}
+</section>
+
+{% if can_switch %}
+<section class="block" id="switch">
+  <h2>Model servers on this machine</h2>
+  {% if discovered %}
+  <p class="lede">
+    Switching applies to the next question asked and is written to <span class="mono">.env</span>, so
+    it survives a restart.
+  </p>
+  <div class="table-wrap">
+  <table class="grid">
+    <thead><tr><th>Runtime</th><th>Endpoint</th><th>Model</th><th>Use</th></tr></thead>
+    <tbody>
+    {% for server in discovered %}
+      {% for model in server.models %}
+      <tr>
+        <td>{{ server.name }}</td>
+        <td class="mono">{{ server.base_url }}</td>
+        <td class="mono">{{ model }}</td>
+        <td class="actions">
+          {% if server.base_url == current.base_url and model == current.model %}
+          <span class="tag state-approved">in use</span>
+          {% else %}
+          <form method="post" action="/admin/connection" class="inline-form">
+            <input type="hidden" name="base_url" value="{{ server.base_url }}">
+            <input type="hidden" name="model" value="{{ model }}">
+            <input type="hidden" name="by" value="admin">
+            <button type="submit" class="small">Use this</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not server.models %}
+      <tr><td>{{ server.name }}</td><td class="mono">{{ server.base_url }}</td><td class="muted">no models listed</td><td></td></tr>
+      {% endif %}
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="hint">
+    Nothing is answering on this machine yet. Start Ollama, LM Studio, llama.cpp or vLLM and reload
+    this page. <a href="/docs/setup">The setup guide</a> covers each.
+  </p>
+  {% endif %}
+  <p class="hint">
+    Keel switches only to a model server on this machine. An endpoint elsewhere is a deployment
+    decision, set through <span class="mono">KEEL_LOCAL_LLM_BASE_URL</span> where it can be reviewed,
+    because a form that accepts any address would let whoever reached it read every question and every
+    retrieved passage by pointing the model at a host of their own.
+  </p>
+</section>
+{% endif %}
+
+<p class="actions inline">
+  <a class="button" href="/admin">Back to admin</a>
+  <a class="button ghost" href="/docs/setup">Setup guide</a>
+</p>
+{% endblock %}

@@ -18,6 +18,11 @@
   {% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
 </section>
 
+<p class="actions inline">
+  <a class="button" href="/admin/connection">Connection and checks</a>
+  <a class="button ghost" href="/chat">Ask a question</a>
+</p>
+
 <section id="totals" class="tiles" aria-label="Totals">
   <div class="tile"><span class="num">{{ totals.requests|thousands }}</span><span class="cap">requests</span></div>
   <div class="tile"><span class="num">{{ totals.refused|thousands }}</span><span class="cap">refusals · {{ totals.refused|percent(totals.requests) }}</span></div>
@@ -170,8 +175,47 @@
     <code>public</code> is readable by everyone. Leave the field empty and it becomes
     <code>public</code>.
   </p>
-</section>
 {% endif %}
+
+{% if documents %}
+  <div class="table-wrap">
+  <table class="grid">
+    <thead><tr><th>Document</th><th>Access tags</th><th>Chunks</th><th>Ingested</th>{% if ingest_enabled %}<th>Change</th>{% endif %}</tr></thead>
+    <tbody>
+    {% for row in documents %}
+      <tr>
+        <td class="q"><span title="{{ row.source }}">{{ row.title }}</span>{% if row.quarantined %} <span class="tag state-refused">{{ row.quarantined }} quarantined</span>{% endif %}</td>
+        <td>{% for tag in row.acl_tags %}<span class="tag acl mono">{{ tag }}</span> {% endfor %}</td>
+        <td class="num-cell">{{ row.chunks }}</td>
+        <td class="mono">{{ row.ingested_at[:10] }}</td>
+        {% if ingest_enabled %}
+        <td class="actions">
+          <form method="post" action="/admin/documents/{{ row.document_id }}/retag" class="inline-form">
+            <input type="text" name="tags" value="{{ row.acl_tags|join(', ') }}" aria-label="Access tags for {{ row.title }}" size="16">
+            <input type="hidden" name="by" value="admin">
+            <button type="submit" class="small">Retag</button>
+          </form>
+          <form method="post" action="/admin/documents/{{ row.document_id }}/remove" class="inline-form"
+                data-confirm="Remove {{ row.title }} and its {{ row.chunks }} chunk(s)? The removal lands in the ledger.">
+            <input type="hidden" name="by" value="admin">
+            <button type="submit" class="small danger">Remove</button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="hint">
+    Retagging moves the document and every chunk of it together, and removal takes the chunks, the
+    full-text entries and the embeddings with it. Both land in the ledger.
+    {% if corpus_tags %}Tags in use across this store: {% for tag in corpus_tags %}<code>{{ tag }}</code>{{ ", " if not loop.last }}{% endfor %}.{% endif %}
+  </p>
+{% else %}
+  <p class="hint">The store holds no documents yet.</p>
+{% endif %}
+</section>
 
 <section id="quarantine" class="block">
   <h2>Quarantine</h2>

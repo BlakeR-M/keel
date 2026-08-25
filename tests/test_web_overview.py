@@ -124,7 +124,9 @@ def test_the_public_pages_never_link_to_the_operator_surface() -> None:
     below: it offers the upload where uploading is possible at all, and stays quiet otherwise.
     """
     templates = Path(__file__).resolve().parent.parent / "keel" / "web" / "templates"
-    allowed = {"admin.html", "admin_request.html", "chat.html"}
+    # The operator pages link among themselves, which is what they are for. `chat.html` is the one
+    # visitor page allowed to, and only conditionally, covered by the two tests below.
+    allowed = {"admin.html", "admin_request.html", "connection.html", "chat.html"}
     offenders = [
         path.name
         for path in sorted(templates.glob("*.html"))

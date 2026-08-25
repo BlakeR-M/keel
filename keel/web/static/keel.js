@@ -143,6 +143,15 @@
     });
   }
 
+  /* Any form carrying data-confirm asks before it submits. Removing a document is the one
+     irreversible action in the interface, so it says what it is about to take with it. Without
+     JavaScript the form still posts, and the removal still lands in the ledger. */
+  document.querySelectorAll("form[data-confirm]").forEach(function (form) {
+    form.addEventListener("submit", function (event) {
+      if (!window.confirm(form.getAttribute("data-confirm"))) { event.preventDefault(); }
+    });
+  });
+
   // ------------------------------------------------------------------ 2. permission comparison
 
   /* One click asks the restricted question as both demo users. Each column is a real request through

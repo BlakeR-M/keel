@@ -658,14 +658,18 @@ def test_every_write_route_sits_under_the_admin_guard() -> None:
         "/api/airgap-probe",
         "/api/redact",
         "/admin/ingest",
+        "/admin/connection",
+        "/admin/documents/{document_id}/retag",
+        "/admin/documents/{document_id}/remove",
         "/admin/approvals/{approval_id}/approve",
         "/admin/approvals/{approval_id}/reject",
         "/admin/quarantine/{chunk_id}/release",
         "/admin/ledger/verify",
     }
-    assert all(path.startswith("/admin") for path in writers if "ingest" in path), (
-        "ingest changes the store, so it belongs behind the admin guard"
-    )
+    for corpus_write in ("ingest", "documents", "connection"):
+        assert all(path.startswith("/admin") for path in writers if corpus_write in path), (
+            f"{corpus_write} changes the appliance, so it belongs behind the admin guard"
+        )
 
 
 def test_the_read_only_posture_leaves_the_ingest_route_unregistered() -> None:
@@ -683,8 +687,9 @@ def test_the_read_only_posture_leaves_the_ingest_route_unregistered() -> None:
         "rows=[];"
         "[rows.extend(getattr(r,'original_router').routes if getattr(r,'original_router',None) "
         "else [r]) for r in app.routes];"
-        "print(web_ingest_enabled(), "
-        "[getattr(r,'path','') for r in rows if 'ingest' in getattr(r,'path','')])"
+        "print(web_ingest_enabled(), sorted("
+        "getattr(r,'path','') for r in rows "
+        "if any(w in getattr(r,'path','') for w in ('ingest','documents/'))))"
     )
     completed = subprocess.run(  # noqa: S603 (fixed argv, no shell)
         [sys.executable, "-c", snippet],

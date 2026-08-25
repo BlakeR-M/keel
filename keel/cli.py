@@ -1,4 +1,4 @@
-"""The `keel` command line: up, setup, doctor, ingest, ask, agent, approvals, verify-ledger, status, serve, eval, export-log.
+"""The `keel` command line: up, setup, doctor, ingest, documents, ask, agent, approvals, verify-ledger, status, serve, eval, export-log.
 
 Importing this module is cheap. Every command builds the application context (`build_context()`)
 inside its own body, so `keel --help` loads nothing heavier than typer. The global `--data-dir` and
@@ -561,6 +561,101 @@ def _ledger_head_seq(ctx: AppContext) -> int:
 
 
 # ---------------------------------------------------------------------- status
+
+
+# ---------------------------------------------------------------------- documents
+
+
+documents_app = typer.Typer(
+    help="List the documents in the store, change their access tags, or take one out.",
+    no_args_is_help=True,
+)
+app.add_typer(documents_app, name="documents")
+
+
+@documents_app.command("list")
+def documents_list(
+    as_json: Annotated[bool, typer.Option("--json", help="Print the rows as JSON.")] = False,
+) -> None:
+    """Every document in the store, newest first, with its access tags and chunk count."""
+    from keel.documents import corpus_tags, list_documents
+
+    with _context() as ctx:
+        rows = list_documents(ctx.conn)
+        tags = corpus_tags(ctx.conn)
+
+    if as_json:
+        typer.echo(json.dumps([row.to_dict() for row in rows], indent=2))
+        return
+    if not rows:
+        typer.echo("The store holds no documents. Add one with `keel ingest`.")
+        return
+    width = max(len(str(row.document_id)) for row in rows)
+    for row in rows:
+        typer.echo(
+            f"{str(row.document_id).rjust(width)}  {(row.title[:41] + '...' if len(row.title) > 44 else row.title).ljust(44)}"
+            f"{SEPARATOR}{', '.join(row.acl_tags)}"
+            f"{SEPARATOR}{row.chunks} chunk{'' if row.chunks == 1 else 's'}"
+            + (f"{SEPARATOR}{row.quarantined} quarantined" if row.quarantined else "")
+        )
+    typer.echo("")
+    typer.echo(f"{len(rows)} document{'' if len(rows) == 1 else 's'}{SEPARATOR}tags in use: {', '.join(tags)}")
+
+
+@documents_app.command("retag")
+def documents_retag(
+    document_id: Annotated[int, typer.Argument(help="The document id, from `keel documents list`.")],
+    tags: Annotated[str, typer.Option("--tags", help="Comma-separated access tags. Empty means public.")],
+    by: Annotated[str, typer.Option("--by", help="Who is making the change, for the ledger.")] = "",
+) -> None:
+    """Change a document's access tags, and its chunks' tags with it.
+
+    A reader holding any one of the tags can retrieve the document, so this is the control that
+    decides who sees it. The change lands in the ledger.
+    """
+    from keel.documents import retag_document
+
+    with _context() as ctx:
+        try:
+            updated = retag_document(
+                ctx.conn, ctx.index, document_id, tags, by=by or getpass.getuser(), ledger=ctx.ledger
+            )
+        except LookupError as missing:
+            typer.echo(str(missing))
+            raise typer.Exit(1) from missing
+    typer.echo(f"document {updated.document_id}{SEPARATOR}{updated.title}")
+    typer.echo(f"access tags: {', '.join(updated.acl_tags)}{SEPARATOR}{updated.chunks} chunks retagged")
+
+
+@documents_app.command("remove")
+def documents_remove(
+    document_id: Annotated[int, typer.Argument(help="The document id, from `keel documents list`.")],
+    by: Annotated[str, typer.Option("--by", help="Who is making the change, for the ledger.")] = "",
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Remove without the confirmation prompt.")] = False,
+) -> None:
+    """Take a document out of the store, with its chunks, full-text entries and embeddings.
+
+    The removal is recorded in the ledger before the rows go, so the audit trail keeps a description
+    of what left. Exit 1 when the document is absent.
+    """
+    from keel.documents import get_document, remove_document
+
+    with _context() as ctx:
+        current = get_document(ctx.conn, document_id)
+        if current is None:
+            typer.echo(f"no document {document_id} in this store")
+            raise typer.Exit(1)
+        if not yes:
+            typer.echo(f"{current.title}{SEPARATOR}{current.source}")
+            typer.echo(f"{current.chunks} chunk(s){SEPARATOR}tags {', '.join(current.acl_tags)}")
+            typer.confirm("Remove it", abort=True)
+        removed = remove_document(
+            ctx.conn, ctx.index, document_id, by=by or getpass.getuser(), ledger=ctx.ledger
+        )
+    typer.echo(
+        f"removed document {removed.document_id}{SEPARATOR}{removed.title}"
+        f"{SEPARATOR}{removed.chunks_removed} chunk(s)"
+    )
 
 
 # ---------------------------------------------------------------------- setup and doctor

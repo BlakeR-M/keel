@@ -453,3 +453,9 @@ table.grid td.ref { font-family: var(--mono); font-size: 0.82em; overflow-wrap: 
 /* The identity controls are absent where a reverse proxy decides them, so the row rebalances. */
 .row.no-picker { grid-template-columns: auto 1fr; }
 @media (max-width: 760px) { .row.no-picker { grid-template-columns: 1fr; } }
+
+/* Two small forms side by side in a table cell: retag and remove on a document row. */
+.inline-form { display: inline-flex; gap: var(--s1); align-items: center; margin: 0 var(--s1) 0 0; }
+.inline-form input[type="text"] { padding: 0.25rem 0.4rem; font-size: 0.85rem; }
+button.danger, .button.danger { border-color: var(--bad); color: var(--bad); }
+button.danger:hover, .button.danger:hover { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); }
