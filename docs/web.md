@@ -4,11 +4,18 @@
 vanilla JavaScript file and one stylesheet. There is no build step: a reviewer runs it, opens a browser
 and reads the templates.
 
-The site has four surfaces. `/` is the overview, which is where a reader arriving from a link lands:
-what Keel is, three demonstrations that run the production code paths live, and the way into the
-reference material. `/chat` is the appliance itself. `/docs` renders the Markdown under `docs/` as
-pages of the site, so the reference material and the source never drift apart. `/admin` is the
-operator's surface and needs the token beyond loopback.
+The site has four surfaces. `/about` is the overview: what Keel is, three demonstrations that run the
+production code paths live, and the way into the reference material. `/chat` is the appliance itself.
+`/docs` renders the Markdown under `docs/` as pages of the site, so the reference material and the
+source never drift apart. `/admin` is the operator's surface, needs the token beyond loopback, and is
+linked from no page a visitor can reach.
+
+**What `/` serves depends on who deployed it.** `KEEL_FRONT_PAGE` decides, and on its default of
+`auto` the hosted demo of the fixture corpus leads with the overview, while every other deployment
+leads with the question box. Someone who installed Keel came to use it, and landing them on an
+explanation reads as a missing application. Set `KEEL_FRONT_PAGE=overview` or `=chat` to decide it
+outright. The overview keeps its place at `/about` in every case, and the header names whichever page
+`/` serves so a reader is never sent to the page they are already on.
 
 ## Run
 
@@ -36,8 +43,9 @@ and the app uses that instead. Import time touches neither the model nor the sto
 
 | Method and path | What it does |
 | --- | --- |
-| `GET /` | Overview: what Keel is, the permission comparison, the air-gap probe, the redaction demonstration, how a question travels, the review summary, the control table, the deployment shapes and the documentation index. The comparison appears where the demo user picker is honoured, which is loopback and `KEEL_DEMO_IDENTITY=1`. |
-| `GET /chat` | The appliance: question box, user select (`public` [public], `hr-officer` [public, hr]), free extra tags, mode toggle answer or agent, submit. Results render in place. |
+| `GET /` | The question box, or the overview on the hosted demo. See `KEEL_FRONT_PAGE` above. |
+| `GET /about` | The overview: what Keel is, the access-control comparison, the air-gap probe, the redaction demonstration, how a question is answered, the review summary, the control table, the deployment shapes and the documentation index. The comparison appears where the demo user picker is honoured, which is loopback and `KEEL_DEMO_IDENTITY=1`. |
+| `GET /chat` | The appliance: question box, user select (`public` [public], `hr-officer` [public, hr]), free extra tags, mode toggle answer or agent, submit. Results render in place. An empty store says so and names the command that fills it, rather than refusing every question without explanation. |
 | `GET /docs` | The documentation index, built from the Markdown files in `docs/`, in the reading order `keel.web.docs.READING_ORDER` names. |
 | `GET /docs/{slug}` | One document, rendered from `docs/{slug}.md`. A slug is lower-case words joined by hyphens, so it can name nothing outside the directory; the resolved path is checked against `docs/` as well, which closes a symlink pointing out. Sibling `.md` links become pages here and anything reaching out of `docs/` becomes a link into the repository on GitHub. |
 | `POST /ask` | Runs the question. Body is a form or JSON `{question, user_id, tags, mode}`. Replies with the HTML result partial when the request carries `X-Keel-Partial: 1` (what `keel.js` sends), JSON when `Accept: application/json`, otherwise the full chat page with the result in place (plain form post, JavaScript off). |

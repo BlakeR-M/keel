@@ -9,6 +9,7 @@ through a TestClient over a stub AppContext, so nothing here loads a model or op
 from __future__ import annotations
 
 import re
+import sqlite3
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -46,9 +47,21 @@ def read(path: Path) -> str:
 
 @pytest.fixture
 def client() -> Iterator[TestClient]:
-    """A TestClient over the app with a stub context installed, so the chat page renders with the
-    profile and air-gap state and the lifespan handler leaves the model and the store alone."""
-    app.state.ctx = SimpleNamespace(profile="local", settings=SimpleNamespace(airgap=True))
+    """A TestClient over the app with a stub context installed, so the pages render with the profile
+    and air-gap state and the lifespan handler leaves the model alone.
+
+    The store is an empty in-memory SQLite, because the question box now reports what the corpus
+    holds. `front_page` is pinned to the overview so `/` stays the page these tests are reading.
+    """
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
+    conn.execute("CREATE TABLE documents (id INTEGER PRIMARY KEY, source TEXT, title TEXT)")
+    app.state.ctx = SimpleNamespace(
+        profile="local",
+        settings=SimpleNamespace(
+            airgap=True, host="127.0.0.1", demo_identity=False, front_page="overview"
+        ),
+        conn=conn,
+    )
     app.state.ctx_owned = False
     with TestClient(app) as test_client:
         yield test_client

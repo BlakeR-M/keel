@@ -481,6 +481,21 @@ def test_compose_files_parse_and_declare_airgap() -> None:
     )
     assert "server-cuda" in gpu["services"]["llama"]["image"]
 
+    # The host-model stack brings no model of its own and reaches the runtime already on the machine.
+    # The guard stays on there too, with the host bridge as the one destination it permits.
+    host_model = yaml.safe_load(
+        (REPO_ROOT / "deploy" / "onprem" / "docker-compose.host-model.yml").read_text(encoding="utf-8")
+    )
+    assert set(host_model["services"]) == {"keel"}, "this stack runs Keel alone"
+    host_env = host_model["services"]["keel"]["environment"]
+    assert host_env["KEEL_AIRGAP"] == "1"
+    assert host_env["KEEL_AIRGAP_ALLOW_HOSTS"] == "host.docker.internal"
+    assert "host.docker.internal" in host_env["KEEL_LOCAL_LLM_BASE_URL"]
+    assert host_env["KEEL_BOOTSTRAP_CORPUS"] == "fixtures/corpus.yaml", "it answers a question after up"
+    assert "host.docker.internal:host-gateway" in host_model["services"]["keel"]["extra_hosts"], (
+        "Linux needs this line for host.docker.internal to resolve at all"
+    )
+
 
 # --------------------------------------------------------------------------------------------------
 # Integration: local llama-server and the fastembed cache keep working under the guard

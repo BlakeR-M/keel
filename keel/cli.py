@@ -1,4 +1,4 @@
-"""The `keel` command line: setup, doctor, ingest, ask, agent, approvals, verify-ledger, status, serve, eval, export-log.
+"""The `keel` command line: up, setup, doctor, ingest, ask, agent, approvals, verify-ledger, status, serve, eval, export-log.
 
 Importing this module is cheap. Every command builds the application context (`build_context()`)
 inside its own body, so `keel --help` loads nothing heavier than typer. The global `--data-dir` and
@@ -781,6 +781,113 @@ def status() -> None:
 # ---------------------------------------------------------------------- serve
 
 
+def _open_browser_when_ready(url: str, delay: float = 1.5) -> None:
+    """Open `url` in the operator's browser shortly after the server starts.
+
+    A timer rather than a startup hook, because `uvicorn.run` blocks and never hands control back.
+    Launching a browser is a desktop action rather than a network one, so the air-gap guard has no
+    opinion on it, and a failure here stays quiet since the URL is printed either way.
+    """
+    import threading
+    import webbrowser
+
+    def go() -> None:
+        try:
+            webbrowser.open(url)
+        except Exception:  # noqa: BLE001 (a headless box has no browser, which is fine)
+            pass
+
+    threading.Timer(delay, go).start()
+
+
+def _serves_a_person(host: str) -> bool:
+    """True when this binding is a person's own machine rather than a server.
+
+    Opening a browser makes sense on loopback. On 0.0.0.0 or a routable address the operator is
+    somewhere else entirely, so the URL is printed and nothing is launched.
+    """
+    from keel.web.views import is_loopback
+
+    return is_loopback(host)
+
+
+def _run_server(host: str | None, port: int | None, open_browser: bool) -> None:
+    """Bind and serve, shared by `keel serve` and `keel up`."""
+    import uvicorn
+
+    from keel.config import get_settings
+
+    settings = get_settings()
+    bind_host = host or settings.host
+    bind_port = port if port is not None else settings.port
+    url = f"http://{bind_host}:{bind_port}"
+    typer.echo(f"keel web: {url}")
+    if open_browser and _serves_a_person(bind_host):
+        typer.echo("opening it in your browser")
+        _open_browser_when_ready(url)
+    uvicorn.run("keel.web.app:app", host=bind_host, port=bind_port)
+
+
+@app.command()
+def up(
+    open_browser: Annotated[
+        bool, typer.Option("--open/--no-open", help="Open the browser once the server is answering.")
+    ] = True,
+) -> None:
+    """Configure, load and serve in one command: the first thing to run after cloning.
+
+    Looks for a model server when none is configured, loads the fixture corpus when the store is
+    empty, then starts the web app and opens it. Every step is skipped when it has already happened,
+    so a second run just starts the server.
+    """
+    from keel.config import Settings
+    from keel.onboarding import discover, merge_env, probe_endpoint
+
+    settings = Settings()
+    if settings.profile == "local":
+        reachable, _, _ = probe_endpoint(settings.local_llm_base_url, settings.local_llm_api_key)
+        if not reachable:
+            typer.echo("Looking for a chat server on this machine...")
+            found = discover()
+            if found:
+                pick = found[0]
+                listed = ", ".join(pick.models[:4]) or "no models listed"
+                typer.echo(f"  {pick.name} at {pick.base_url}{SEPARATOR}{listed}")
+                values = {"KEEL_PROFILE": "local", "KEEL_LOCAL_LLM_BASE_URL": pick.base_url}
+                if pick.first_model:
+                    values["KEEL_LOCAL_LLM_MODEL"] = pick.first_model
+                merge_env(Path(".env"), values)
+                os.environ.update(values)
+                typer.echo(f"  wrote .env{SEPARATOR}run `keel setup` to choose a different one")
+            else:
+                typer.echo("  nothing answering yet. Retrieval and the security controls still work.")
+                typer.echo("  for generated answers, start Ollama or LM Studio then run `keel setup`.")
+            typer.echo("")
+
+    manifest = Path("fixtures/corpus.yaml")
+    if manifest.is_file():
+        from keel.ingest import ingest_manifest
+
+        with _context() as ctx:
+            documents = int(ctx.conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0])
+            if documents == 0:
+                typer.echo("Loading the fixture corpus so there is something to ask...")
+                results = ingest_manifest(
+                    ctx.conn,
+                    ctx.settings,
+                    ctx.embedder,
+                    ctx.index,
+                    manifest,
+                    screen=ctx.screen,
+                    ledger=ctx.ledger,
+                )
+                _report_ingest(results)
+                typer.echo("")
+
+    _run_server(None, None, open_browser)
+
+
+
 @app.command()
 def serve(
     host: Annotated[
@@ -790,17 +897,13 @@ def serve(
     port: Annotated[
         int | None, typer.Option("--port", help="Port; defaults to KEEL_PORT (8400).", show_default=False)
     ] = None,
+    open_browser: Annotated[
+        bool,
+        typer.Option("--open/--no-open", help="Open the browser when bound to loopback."),
+    ] = False,
 ) -> None:
-    """Start the web app (chat, citations, admin page) with uvicorn."""
-    import uvicorn
-
-    from keel.config import get_settings
-
-    settings = get_settings()
-    bind_host = host or settings.host
-    bind_port = port if port is not None else settings.port
-    typer.echo(f"keel web: http://{bind_host}:{bind_port}")
-    uvicorn.run("keel.web.app:app", host=bind_host, port=bind_port)
+    """Start the web app (question box, citations, admin page) with uvicorn."""
+    _run_server(host, port, open_browser)
 
 
 # ---------------------------------------------------------------------- eval

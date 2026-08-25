@@ -11,6 +11,14 @@ git clone https://github.com/BlakeR-M/keel.git
 cd keel
 python -m venv .venv && .venv/bin/pip install -e ".[dev]"   # .venv\Scripts\pip on Windows
 
+keel up
+```
+
+`keel up` does the whole first run: finds a chat server you already have, loads the fixture corpus,
+starts the appliance and opens it. Each step is skipped once it has happened, so running it again
+just starts the server. The pieces separately, when you want to watch each one:
+
+```bash
 keel setup      # finds a chat server you already run and writes .env
 keel doctor     # confirms the configuration, and names the fix for anything unready
 keel serve      # http://127.0.0.1:8400
@@ -122,10 +130,31 @@ Install the cloud extra so the credential libraries are present:
 pip install -e ".[azure]"
 ```
 
-## Option 4: Docker, with your own model container
+## Option 4: Docker
 
-`deploy/onprem/docker-compose.yml` runs a llama.cpp server and Keel side by side, with the app under
-`KEEL_AIRGAP=1` so the only host it can reach is the model container.
+Two stacks, and the first one is the short path. With a model runtime already on the machine, this
+needs no GGUF placed anywhere: Keel reaches your runtime through the host bridge and loads the
+fixture corpus on first start.
+
+```bash
+docker compose -f deploy/onprem/docker-compose.host-model.yml up -d --build
+# then open http://127.0.0.1:8400
+```
+
+It defaults to Ollama on 11434. Point it elsewhere before `up`:
+
+```bash
+KEEL_HOST_MODEL_URL=http://host.docker.internal:1234/v1 KEEL_HOST_MODEL=your-model   docker compose -f deploy/onprem/docker-compose.host-model.yml up -d --build
+```
+
+The guard stays on in that stack, with the host bridge as the one destination it permits. Prove it
+from inside the container:
+
+```bash
+docker compose -f deploy/onprem/docker-compose.host-model.yml exec keel   python -m keel.web.airgap_probe data.attacker.example
+```
+
+To keep everything in containers instead, `docker-compose.yml` brings its own llama.cpp server:
 
 ```bash
 # put a GGUF at deploy/onprem/models/model.gguf, or set KEEL_MODELS_DIR and KEEL_MODEL_FILE
@@ -181,6 +210,7 @@ attached at all.
 | `KEEL_DATA_DIR` | `./data` | Where the SQLite store and the ledger live |
 | `KEEL_AIRGAP` | `0` | `1` refuses every outbound connection outside the allow list |
 | `KEEL_AIRGAP_ALLOW_HOSTS` | unset | Extra hosts the guard permits, comma separated |
+| `KEEL_FRONT_PAGE` | `auto` | What `/` serves. `auto` gives the question box on an installed appliance and the overview on the hosted demo. `overview` and `chat` decide it outright, and `/about` keeps the overview either way |
 | `KEEL_HOST` | `127.0.0.1` | Binding beyond loopback turns the admin guard on |
 | `KEEL_ADMIN_TOKEN` | unset | Needed for `/admin` once bound beyond loopback |
 | `KEEL_PROXY_TOKEN` | unset | Lets an authenticating reverse proxy assert identity |

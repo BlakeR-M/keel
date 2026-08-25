@@ -43,7 +43,7 @@ without a model server or a network connection; the integration tests in
 | Evaluation with a regression gate: a golden set runs through the production answer path, scores retrieval, refusals, leak strings and judged quality, writes HTML and JSON reports, and fails when a gated metric drops past its threshold | [`keel/evals/run.py`](keel/evals/run.py), [`keel/evals/metrics.py`](keel/evals/metrics.py), [`keel/evals/judge.py`](keel/evals/judge.py), [`keel/evals/report.py`](keel/evals/report.py) | [`tests/test_evals.py`](tests/test_evals.py)`::test_broken_retriever_zeroes_hit_at_3_refuses_everything_and_fails_the_gate`, `::test_must_not_include_catches_a_planted_override_string` |
 | Cloud profile without keys: `DefaultAzureCredential` and a user-assigned managed identity; the Bicep template disables local key auth on Azure OpenAI and Azure AI Search | [`keel/providers/azure.py`](keel/providers/azure.py), [`deploy/azure/main.bicep`](deploy/azure/main.bicep) | [`tests/test_azure_provider.py`](tests/test_azure_provider.py)`::TestCredentials::test_chat_uses_default_azure_credential_when_no_client_is_injected`, `::TestAzureSearchIndex::test_search_builds_acl_filter_and_maps_hits`; CI `bicep build` and `bicep lint` |
 
-The full suite is 626 tests across 20 files (`.venv\Scripts\python.exe -m pytest --collect-only -q`),
+The full suite is 641 tests across 20 files (`.venv\Scripts\python.exe -m pytest --collect-only -q`),
 of which 174 are adversarial cases from the 105 attack tests in `tests/redteam_*.py` (below). CI runs the unit and contract tests
 with `-m "not integration"`, ruff, `bicep build` and `bicep lint`, and the eval harness against fakes
 ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
@@ -83,7 +83,17 @@ git clone https://github.com/BlakeR-M/keel.git
 cd keel
 python -m venv .venv && .venv/bin/pip install -e ".[dev]"   # .venv\Scripts\pip on Windows
 
-keel setup      # finds your model server, writes .env, loads the fixture corpus
+keel up
+```
+
+`keel up` finds your model server, loads the fixture corpus, starts the appliance and opens it in
+your browser. It lands you on the question box, because whoever installed Keel came to use it. Each
+step is skipped once it has already happened, so a second run just starts the server.
+
+The same three steps separately, when you want to see each one:
+
+```bash
+keel setup      # finds your model server and writes .env
 keel doctor     # confirms the configuration, and names the fix for anything unready
 keel serve      # http://127.0.0.1:8400
 ```
@@ -117,11 +127,19 @@ keel serve                                            # then open http://127.0.0
 Retrieval, entitlement filtering, injection screening, the ledger and the approval queue all work
 with no model attached at all. A refusal costs zero model calls, so it answers instantly either way.
 
-### Docker, or the scripted path
+### Docker
 
-`deploy/onprem/docker-compose.yml` runs a llama.cpp server and Keel side by side, with the app under
-`KEEL_AIRGAP=1` so the only host it can reach is the model container. Put a GGUF at
-`deploy/onprem/models/model.gguf` first, then:
+With a model runtime already on the machine (Ollama, LM Studio, llama.cpp or vLLM), one command and
+no GGUF to place anywhere. Keel reaches your runtime through the host bridge, loads the fixture
+corpus on first start, and runs with the air-gap guard on and that bridge as the only destination it
+permits:
+
+```bash
+docker compose -f deploy/onprem/docker-compose.host-model.yml up -d --build
+```
+
+To run the whole stack in containers instead, `deploy/onprem/docker-compose.yml` brings its own
+llama.cpp server. Put a GGUF at `deploy/onprem/models/model.gguf` first, then:
 
 ```bash
 docker compose -f deploy/onprem/docker-compose.yml up -d --build
@@ -298,7 +316,7 @@ it from a fresh shell.
 | [`keel/evals/`](keel/evals/run.py) | Golden set, judge, metrics, runner, HTML report |
 | [`keel/web/`](keel/web/app.py) | FastAPI app, view helpers, Jinja templates, one stylesheet and one script |
 | [`keel/cli.py`](keel/cli.py) | The `keel` command line (`python -m keel` runs the same app) |
-| [`tests/`](tests/conftest.py) | 626 tests including the three `redteam_*.py` files; [`tests/fakes.py`](tests/fakes.py) holds the `FakeLLM` the unit tests use |
+| [`tests/`](tests/conftest.py) | 641 tests including the three `redteam_*.py` files; [`tests/fakes.py`](tests/fakes.py) holds the `FakeLLM` the unit tests use |
 | [`fixtures/`](fixtures/corpus.yaml) | The original fixture corpus (`corpus/`, `corpus.yaml`) and the golden set ([`golden.yaml`](fixtures/golden.yaml)) |
 | [`scripts/`](scripts/fetch_demo_corpus.py) | `fetch_demo_corpus.py`, an optional CC BY 4.0 public corpus fetcher for a larger demo set |
 | [`deploy/onprem/`](deploy/onprem/run.ps1), [`deploy/azure/`](deploy/azure/README.md), [`deploy/aws/`](deploy/aws/README.md) | Native runners and Compose stack; Bicep, parameters and `deploy.ps1`; the AWS stub README |

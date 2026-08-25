@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Keel · Live demonstration{% endblock %}
+{% block title %}Keel · Ask a question{% endblock %}
 {% block content %}
 <section class="intro">
-  <p class="crumbs"><a href="/">Overview</a> / Live demonstration</p>
+  {% if front == 'overview' %}<p class="crumbs"><a href="/">Overview</a> / Ask a question</p>{% endif %}
   <h1>Ask a question</h1>
   {% if demo %}
   <dialog id="intro" aria-labelledby="intro-title">
@@ -19,14 +19,30 @@
     asked as two users side by side. <a href="#" id="intro-open">About this demonstration</a>
   </p>
   {% endif %}
+  {% if documents == 0 %}
+  <p class="banner">
+    This store holds no documents yet, so every question here is refused for want of sources. Load
+    the five fixture documents with <span class="mono">keel ingest --manifest fixtures/corpus.yaml</span>,
+    or point ingest at files of your own. <a href="/docs/setup">The setup guide</a> covers both, and
+    <span class="mono">keel doctor</span> reports what else a first run wants.
+  </p>
+  {% endif %}
   <p class="lede">Keel answers from the documents the selected user may read and cites each source. Where the sources fall outside the question, it says so and stops. Agent mode lets the model call tools, and any write action waits in the approval queue for a person to release it.</p>
   <p class="lede">Retrieval combines a keyword search and a vector search by reciprocal rank fusion, then reranks the result. The entitlement filter is written into each query, so it applies before either set is combined.</p>
+  {% if fixture_corpus %}
   <p class="hint">
     Questions this corpus answers: how many written quotes a $20,000 purchase needs at Northbank
     Council, how long the Harbour Clinic keeps patient records, and what the confidential review code
     for the 2026 pay round is. The last one is restricted, so it wants the
     <span class="mono">hr-officer</span> user.
   </p>
+  {% elif documents %}
+  <p class="hint">
+    {{ documents }} document{{ '' if documents == 1 else 's' }} in this store. A question the sources
+    leave uncovered is refused rather than guessed at, and the user select decides which documents
+    count as sources for the question.
+  </p>
+  {% endif %}
 </section>
 
 <form id="ask-form" method="post" action="/ask" class="ask">

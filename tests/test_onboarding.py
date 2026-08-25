@@ -281,3 +281,62 @@ def test_doctor_is_listed_in_the_help_so_a_stuck_reader_finds_it() -> None:
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
     assert "setup" in result.output and "doctor" in result.output
+
+
+# ---------------------------------------------------------------------- serving
+
+
+def test_the_browser_opens_only_where_a_person_is_sitting() -> None:
+    """A server bound to 0.0.0.0 has its operator somewhere else entirely, so launching a browser on
+    the box would be noise at best. Loopback is the case where it helps."""
+    from keel.cli import _serves_a_person
+
+    assert _serves_a_person("127.0.0.1") is True
+    assert _serves_a_person("localhost") is True
+    assert _serves_a_person("::1") is True
+    assert _serves_a_person("0.0.0.0") is False
+    assert _serves_a_person("10.1.2.3") is False
+
+
+def test_serve_leaves_the_browser_alone_unless_asked() -> None:
+    """`--open` is opt-in on `keel serve`, so a scripted or containerised start stays quiet."""
+    import inspect
+
+    from keel.cli import serve
+
+    default = inspect.signature(serve).parameters["open_browser"].default
+    assert default is False
+
+
+def test_up_opens_the_browser_by_default() -> None:
+    """`keel up` is the command a person runs by hand after cloning, so it finishes by showing them
+    the thing they just started."""
+    import inspect
+
+    from keel.cli import up
+
+    assert inspect.signature(up).parameters["open_browser"].default is True
+
+
+def test_up_is_listed_first_among_the_commands_a_new_reader_needs() -> None:
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    for command in ("up", "setup", "doctor", "serve"):
+        assert command in result.output, command
+
+
+def test_opening_a_browser_survives_a_machine_with_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A headless box raises from webbrowser.open. The URL is printed either way, so the failure
+    stays quiet rather than taking the server down with it."""
+    import webbrowser
+
+    from keel.cli import _open_browser_when_ready
+
+    def explode(_url: str) -> bool:
+        raise RuntimeError("no browser here")
+
+    monkeypatch.setattr(webbrowser, "open", explode)
+    _open_browser_when_ready("http://127.0.0.1:8400", delay=0.01)
+    import time
+
+    time.sleep(0.2)  # let the timer thread run and swallow its own failure

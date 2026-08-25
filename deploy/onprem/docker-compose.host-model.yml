@@ -1,0 +1,57 @@
+# Keel against a model runtime you already have on this machine.
+#
+#   docker compose -f deploy/onprem/docker-compose.host-model.yml up -d --build
+#   open http://127.0.0.1:8400
+#
+# Use this when Ollama, LM Studio, llama.cpp or vLLM is already running on the host. Keel reaches it
+# through host.docker.internal and needs no GGUF placed in this repository, which is the difference
+# from docker-compose.yml, where the stack brings its own llama.cpp container and model file.
+#
+# The fixture corpus loads itself into an empty store on first start (KEEL_BOOTSTRAP_CORPUS), so the
+# stack answers a question straight after `up` rather than waiting for an ingest command.
+#
+# Air-gap stays on. The allow list holds the host bridge and nothing else, so the container reaches
+# your model runtime and refuses every other destination. Prove that from inside:
+#   docker compose -f deploy/onprem/docker-compose.host-model.yml exec keel \
+#     python -m keel.web.airgap_probe data.attacker.example
+#
+# Point it at a different runtime by setting these before `up`:
+#   KEEL_HOST_MODEL_URL   default http://host.docker.internal:11434/v1   (Ollama)
+#                         LM Studio: http://host.docker.internal:1234/v1
+#                         llama.cpp: http://host.docker.internal:8081/v1
+#                         vLLM:      http://host.docker.internal:8000/v1
+#   KEEL_HOST_MODEL       the model name that runtime serves, e.g. llama3.1:8b
+
+name: keel-host-model
+
+services:
+  keel:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # Docker Desktop resolves host.docker.internal already. On Linux this line is what creates it.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      KEEL_PROFILE: local
+      KEEL_DATA_DIR: /app/data
+      KEEL_LOCAL_LLM_BASE_URL: ${KEEL_HOST_MODEL_URL:-http://host.docker.internal:11434/v1}
+      KEEL_LOCAL_LLM_MODEL: ${KEEL_HOST_MODEL:-llama3.1:8b}
+      KEEL_LOCAL_LLM_TIMEOUT: "300"
+      KEEL_BOOTSTRAP_CORPUS: fixtures/corpus.yaml
+      KEEL_AIRGAP: "1"
+      KEEL_AIRGAP_ALLOW_HOSTS: host.docker.internal
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      HF_HUB_DISABLE_SYMLINKS_WARNING: "1"
+    ports:
+      - "${KEEL_BIND:-127.0.0.1}:8400:8400"
+    volumes:
+      - keel-host-model-data:/app/data
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  keel-host-model-data:
+    name: keel-host-model-data

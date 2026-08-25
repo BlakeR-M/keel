@@ -13,6 +13,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Profile = Literal["local", "azure", "aws"]
+FrontPage = Literal["auto", "overview", "chat"]
 
 
 class Settings(BaseSettings):
@@ -58,6 +59,10 @@ class Settings(BaseSettings):
     # Web
     host: str = "127.0.0.1"
     port: int = 8400
+    front_page: FrontPage = "auto"
+    """What `/` serves. `auto` reads the deployment: the overview on the hosted demo of the fixture
+    corpus, and the question box everywhere else, since anyone who installed Keel came to use it
+    rather than to read about it. The overview stays at `/about` either way."""
 
     # Hosted demo of the fixture corpus. Never set these for a real deployment.
     demo_identity: bool = False

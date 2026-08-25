@@ -155,14 +155,16 @@ _env.globals.update({"version": __version__, "demo_users": DEMO_USERS, "github":
 def render(name: str, *, status: int = 200, **context: Any) -> HTMLResponse:
     """Render a template to an HTML response. Every value is escaped unless it is a Markup.
 
-    The footer reads `profile` and `airgap`; they are filled from the app context when the caller
-    did not pass them, so every page shows the same status line.
+    The footer reads `profile` and `airgap` and the header reads `front`; all three are filled from
+    the app context when the caller did not pass them, so every page shows the same status line and
+    the same navigation.
     """
     ctx = getattr(app.state, "ctx", None)
     if ctx is not None:
         context.setdefault("profile", ctx.profile)
         context.setdefault("airgap", ctx.settings.airgap)
         context.setdefault("demo", getattr(ctx.settings, "demo_identity", False))
+        context.setdefault("front", front_page(ctx))
     return HTMLResponse(_env.get_template(name).render(**context), status_code=status)
 
 
@@ -470,15 +472,22 @@ def identity_picker(ctx: AppContext) -> bool:
     return is_loopback(host) or bool(getattr(ctx.settings, "demo_identity", False))
 
 
-@app.get("/", response_class=HTMLResponse)
-@app.head("/", response_class=HTMLResponse)
-def overview(request: Request) -> HTMLResponse:
-    """The front door: what Keel is, the three live demonstrations, and the way into the documentation.
+def front_page(ctx: AppContext) -> str:
+    """`overview` or `chat`: what `/` serves on this deployment.
 
-    A reader arriving cold from a link lands here rather than in the question box, so the security
-    posture is the first thing on the page instead of something to be inferred from a form.
+    `KEEL_FRONT_PAGE` decides it outright when set. On `auto`, the hosted demo of the fixture corpus
+    leads with the overview, because a visitor arriving from a link needs orienting before a form.
+    Every other deployment leads with the question box, because whoever installed Keel came to use it.
+    The overview stays at `/about` in both cases.
     """
-    ctx = get_ctx(request)
+    choice = str(getattr(ctx.settings, "front_page", "auto") or "auto")
+    if choice in ("overview", "chat"):
+        return choice
+    return "overview" if getattr(ctx.settings, "demo_identity", False) else "chat"
+
+
+def overview_page(ctx: AppContext) -> HTMLResponse:
+    """The overview: what Keel is, the three live demonstrations, the way into the documentation."""
     return render(
         "landing.html",
         active="overview",
@@ -488,6 +497,23 @@ def overview(request: Request) -> HTMLResponse:
         redact_sample=REDACT_SAMPLE,
         docs=web_docs.index(),
     )
+
+
+@app.get("/", response_class=HTMLResponse)
+@app.head("/", response_class=HTMLResponse)
+def root(request: Request) -> HTMLResponse:
+    """The front door, which depends on who deployed this. See `front_page`."""
+    ctx = get_ctx(request)
+    if front_page(ctx) == "overview":
+        return overview_page(ctx)
+    return chat_page(ctx)
+
+
+@app.get("/about", response_class=HTMLResponse)
+@app.head("/about", response_class=HTMLResponse)
+def about(request: Request) -> HTMLResponse:
+    """The overview, always reachable whichever page `/` serves."""
+    return overview_page(get_ctx(request))
 
 
 @app.get("/docs", response_class=HTMLResponse)
@@ -526,20 +552,48 @@ def _neighbour(ordered: list[str], index: int) -> web_docs.Doc | None:
 # ---------------------------------------------------------------------- chat
 
 
+FIXTURE_MARKER = "northbank-council-procurement"
+
+
+def corpus_state(ctx: AppContext) -> tuple[int, bool]:
+    """(document count, whether the fixture corpus is loaded).
+
+    The sample questions on the question box name Northbank Council and the Harbour Clinic, so they
+    help only where those documents are present. Somebody running Keel over their own files gets the
+    box without the fixture hints.
+    """
+    documents = int(ctx.conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0])
+    if documents == 0:
+        return 0, False
+    row = ctx.conn.execute(
+        "SELECT 1 FROM documents WHERE source LIKE ? LIMIT 1", (f"%{FIXTURE_MARKER}%",)
+    ).fetchone()
+    return documents, row is not None
+
+
 def chat_page(
     ctx: AppContext, *, form: dict[str, Any] | None = None, result: dict[str, Any] | None = None
 ) -> HTMLResponse:
-    """The chat page, with the submitted values kept in the form and any result rendered in place."""
+    """The question box, with the submitted values kept in the form and any result rendered in place."""
     values = {"question": "", "user_id": "public", "tags": "", "mode": "answer"}
     if form:
         values.update({k: str(v or "") for k, v in form.items() if k in values})
-    return render("chat.html", active="chat", profile=ctx.profile, form=values, result=result)
+    documents, fixtures = corpus_state(ctx)
+    return render(
+        "chat.html",
+        active="chat",
+        profile=ctx.profile,
+        form=values,
+        result=result,
+        documents=documents,
+        fixture_corpus=fixtures,
+    )
 
 
 @app.get("/chat", response_class=HTMLResponse)
 @app.head("/chat", response_class=HTMLResponse)
 def chat(request: Request) -> HTMLResponse:
-    """The live appliance: question box, user select, free tags, answer or agent mode."""
+    """The appliance: question box, user select, free tags, answer or agent mode."""
     return chat_page(get_ctx(request))
 
 

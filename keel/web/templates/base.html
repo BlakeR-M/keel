@@ -24,11 +24,20 @@
       <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect width="16" height="16" rx="3" fill="#0f1317"/><path d="M4.5 3v10M4.5 8l6-5M4.5 8l6 5" stroke="#7aa2c8" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Keel
     </a>
+    {# The first entry is whatever `/` serves here. On the hosted demo that is the overview; on an
+       installed appliance it is the question box, and the overview keeps its place at /about. #}
     <nav aria-label="Sections">
+      {% if front == 'overview' %}
       <a href="/"{% if active == 'overview' %} class="on" aria-current="page"{% endif %}>Overview</a>
       <a href="/chat"{% if active == 'chat' %} class="on" aria-current="page"{% endif %}>Demo</a>
+      {% else %}
+      <a href="/"{% if active == 'chat' %} class="on" aria-current="page"{% endif %}>Ask</a>
+      {% endif %}
       <a href="/docs"{% if active == 'docs' %} class="on" aria-current="page"{% endif %}>Docs</a>
       <a href="/health"{% if active == 'health' %} class="on" aria-current="page"{% endif %}>Health</a>
+      {% if front != 'overview' %}
+      <a href="/about"{% if active == 'overview' %} class="on" aria-current="page"{% endif %}>About</a>
+      {% endif %}
     </nav>
     {% if profile %}<span class="pill" title="Deploy profile">{{ profile }}</span>{% endif %}
   </div>

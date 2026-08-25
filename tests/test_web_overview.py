@@ -12,6 +12,7 @@ function.
 
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
@@ -28,17 +29,28 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 OUTSIDE_HOST = "data.attacker.example"
 
 
+def _empty_store() -> sqlite3.Connection:
+    """An in-memory store with the one table the question box reads to report the corpus."""
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
+    conn.execute("CREATE TABLE documents (id INTEGER PRIMARY KEY, source TEXT, title TEXT)")
+    return conn
+
+
 @pytest.fixture
 def client() -> Iterator[TestClient]:
     """A TestClient over a stub context, so nothing here loads a model or opens a store.
 
-    These routes read templates, Markdown and two settings. `host` is loopback so the demo user
+    These routes read templates, Markdown and a few settings. `host` is loopback so the demo user
     picker is honoured and the overview renders the comparison, which is what it does for anyone
-    running the appliance on their own machine.
+    running the appliance on their own machine. `front_page` is pinned to the overview so `/` serves
+    the page these tests are about; what `/` serves by default is covered separately below.
     """
     app.state.ctx = SimpleNamespace(
         profile="local",
-        settings=SimpleNamespace(airgap=True, host="127.0.0.1", demo_identity=False),
+        settings=SimpleNamespace(
+            airgap=True, host="127.0.0.1", demo_identity=False, front_page="overview"
+        ),
+        conn=_empty_store(),
     )
     app.state.ctx_owned = False
     with TestClient(app) as test_client:
@@ -389,3 +401,80 @@ def test_every_document_named_in_the_reading_order_exists() -> None:
     """A slug in the reading order with no file behind it would leave a dead card on the index."""
     missing = [slug for slug in docs.READING_ORDER if not (docs.DOCS_DIR / f"{slug}.md").is_file()]
     assert missing == [], missing
+
+
+# ---------------------------------------------------------------------- what `/` serves
+
+
+def _client_with(**settings: object) -> TestClient:
+    """A TestClient whose deployment settings are the ones under test."""
+    base = {"airgap": False, "host": "127.0.0.1", "demo_identity": False, "front_page": "auto"}
+    base.update(settings)
+    app.state.ctx = SimpleNamespace(
+        profile="local", settings=SimpleNamespace(**base), conn=_empty_store()
+    )
+    app.state.ctx_owned = False
+    return TestClient(app)
+
+
+def test_the_hosted_demo_leads_with_the_overview() -> None:
+    """A visitor arriving from a link has to be told what this is before a form makes any sense."""
+    with _client_with(demo_identity=True) as client:
+        html = client.get("/").text
+    assert "Keel is a retrieval and agent appliance" in html
+    assert '<form id="ask-form"' not in html
+
+
+def test_an_installed_appliance_leads_with_the_question_box() -> None:
+    """Whoever cloned and ran Keel came to use it. Landing them on the pitch reads as a missing app,
+    which is the confusion this setting exists to remove."""
+    with _client_with(demo_identity=False) as client:
+        html = client.get("/").text
+    assert '<form id="ask-form"' in html
+    assert 'name="question"' in html
+
+
+@pytest.mark.parametrize(
+    ("front_page", "expects_form"), [("overview", False), ("chat", True)]
+)
+def test_the_setting_overrides_the_deployment(front_page: str, expects_form: bool) -> None:
+    with _client_with(demo_identity=True, front_page=front_page) as client:
+        html = client.get("/").text
+    assert ('<form id="ask-form"' in html) is expects_form
+
+
+@pytest.mark.parametrize("demo_identity", [True, False])
+def test_the_overview_is_always_reachable_at_about(demo_identity: bool) -> None:
+    """Wherever `/` points, the explanation keeps a permanent home."""
+    with _client_with(demo_identity=demo_identity) as client:
+        response = client.get("/about")
+    assert response.status_code == 200
+    assert "Keel is a retrieval and agent appliance" in response.text
+
+
+@pytest.mark.parametrize("demo_identity", [True, False])
+def test_the_question_box_is_always_reachable_at_chat(demo_identity: bool) -> None:
+    with _client_with(demo_identity=demo_identity) as client:
+        response = client.get("/chat")
+    assert response.status_code == 200
+    assert '<form id="ask-form"' in response.text
+
+
+def test_the_navigation_names_the_page_the_front_door_serves() -> None:
+    """The first nav entry is whatever `/` is, so it never sends a reader to a page they are on."""
+    with _client_with(demo_identity=True) as client:
+        demo_nav = client.get("/").text
+    with _client_with(demo_identity=False) as client:
+        installed_nav = client.get("/").text
+    assert ">Overview<" in demo_nav and ">Demo<" in demo_nav
+    assert ">About<" not in demo_nav, "the overview is the front door here, so /about stays quiet"
+    assert ">Ask<" in installed_nav and ">About<" in installed_nav
+
+
+def test_an_empty_store_says_so_rather_than_refusing_without_explanation() -> None:
+    """A fresh install refuses every question for want of sources. Saying why beats looking broken."""
+    with _client_with(demo_identity=False) as client:
+        html = client.get("/chat").text
+    assert "holds no documents yet" in html
+    assert "keel ingest --manifest fixtures/corpus.yaml" in html
+    assert "/docs/setup" in html
