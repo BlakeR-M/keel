@@ -19,40 +19,84 @@
     asked as two users side by side. <a href="#" id="intro-open">About this demonstration</a>
   </p>
   {% endif %}
+
   {% if documents == 0 %}
   <p class="banner">
-    This store holds no documents yet, so every question here is refused for want of sources. Load
-    the five fixture documents with <span class="mono">keel ingest --manifest fixtures/corpus.yaml</span>,
-    or point ingest at files of your own. <a href="/docs/setup">The setup guide</a> covers both, and
-    <span class="mono">keel doctor</span> reports what else a first run wants.
+    This store holds no documents yet, so every question is refused for want of sources. Load the five
+    fixture documents with <span class="mono">keel ingest --manifest fixtures/corpus.yaml</span>, or
+    add your own below.
   </p>
   {% endif %}
-  <p class="lede">Keel answers from the documents the selected user may read and cites each source. Where the sources fall outside the question, it says so and stops. Agent mode lets the model call tools, and any write action waits in the approval queue for a person to release it.</p>
-  <p class="lede">Retrieval combines a keyword search and a vector search by reciprocal rank fusion, then reranks the result. The entitlement filter is written into each query, so it applies before either set is combined.</p>
+
+  <p class="lede">
+    Answers come from the documents your tags allow, each claim citing the passage behind it. A
+    question the sources leave uncovered is refused rather than guessed at.
+  </p>
+
+  {% if not demo %}
+  {# The first thing an operator wants after installing: what to do next, in one place. Open in the
+     markup, so a first visit and a visit without JavaScript both show it, and folded away for good
+     once they collapse it once. #}
+  <details id="getting-started" class="start" open>
+    <summary>Setting this up for your own work</summary>
+    <dl class="explain-list">
+      <dt>Add your documents</dt>
+      <dd>
+        {% if ingest_enabled %}
+        Upload one from <a href="/admin#documents">the Documents section</a>, choosing the access tags
+        that decide who can retrieve it.
+        {% else %}
+        Run <span class="mono">keel ingest ./handbook.pdf --tags public</span>, or point it at a
+        manifest for anything larger than a handful of files.
+        {% endif %}
+        PDF, DOCX, Markdown, HTML and plain text all load.
+      </dd>
+      <dt>Connect a model</dt>
+      <dd>
+        <span class="mono">keel setup</span> looks for one already running on this machine and reads
+        its model list back. Ollama, LM Studio, llama.cpp and vLLM all work, as does any hosted
+        OpenAI-compatible endpoint. <span class="mono">keel doctor</span> names the fix when something
+        is unready.
+      </dd>
+      <dt>Run it in your own Azure</dt>
+      <dd>
+        <span class="mono">keel setup --profile azure</span> takes the endpoints from your own
+        subscription, reached through a user-assigned managed identity that keeps keys out of the code
+        and out of the configuration. <span class="mono">deploy/azure/deploy.ps1</span> creates those
+        resources for you and prints them.
+      </dd>
+      <dt>Decide who reads what</dt>
+      <dd>
+        Tags are the whole access-control model. A reader holding any one of a document's tags can
+        retrieve it, and the filter runs inside retrieval, so a document outside someone's tags never
+        reaches the model that answers them.
+      </dd>
+    </dl>
+    <p class="proof"><a href="/docs/setup">The setup guide</a> covers each of these in full.</p>
+  </details>
+  {% endif %}
+
   {% if fixture_corpus %}
   <p class="hint">
     Questions this corpus answers: how many written quotes a $20,000 purchase needs at Northbank
     Council, how long the Harbour Clinic keeps patient records, and what the confidential review code
     for the 2026 pay round is. The last one is restricted, so it wants the
-    <span class="mono">hr-officer</span> user.
+    <span class="mono">hr-officer</span> tags.
   </p>
   {% elif documents %}
-  <p class="hint">
-    {{ documents }} document{{ '' if documents == 1 else 's' }} in this store. A question the sources
-    leave uncovered is refused rather than guessed at, and the user select decides which documents
-    count as sources for the question.
-  </p>
+  <p class="hint">{{ documents }} document{{ '' if documents == 1 else 's' }} in this store.</p>
   {% endif %}
 </section>
 
 <form id="ask-form" method="post" action="/ask" class="ask">
   <label class="field wide">
     <span class="label">Question</span>
-    <textarea name="question" rows="3" required placeholder="How many quotes does a $20,000 purchase need?">{{ form.question }}</textarea>
+    <textarea name="question" rows="3" required placeholder="What does our policy say about ...">{{ form.question }}</textarea>
   </label>
-  <div class="row">
+  <div class="row{% if not picker %} no-picker{% endif %}">
+    {% if picker %}
     <label class="field">
-      <span class="label">User</span>
+      <span class="label">Ask as</span>
       <select name="user_id" id="user-select">
         {% for uid, tags in demo_users.items() %}
         <option value="{{ uid }}" data-tags="{{ tags|join(', ') }}"{% if form.user_id == uid %} selected{% endif %}>{{ uid }} [{{ tags|join(', ') }}]</option>
@@ -63,6 +107,7 @@
       <span class="label">Extra tags <small>(comma separated)</small></span>
       <input type="text" name="tags" value="{{ form.tags }}" placeholder="finance, legal">
     </label>
+    {% endif %}
     <fieldset class="field mode">
       <legend class="label">Mode</legend>
       <div class="seg">
@@ -74,6 +119,12 @@
       <button type="submit" class="primary">Ask</button>
     </div>
   </div>
+  {% if not picker %}
+  <p class="hint">
+    Your identity and tags come from the reverse proxy in front of Keel, so this page takes neither
+    from the form. See <a href="/docs/web">the web documentation</a>.
+  </p>
+  {% endif %}
 </form>
 
 <section id="result" aria-live="polite">

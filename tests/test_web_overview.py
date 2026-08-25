@@ -116,18 +116,66 @@ def test_navigation_reaches_every_public_page(client: TestClient) -> None:
         assert href in html, href
 
 
-def test_no_page_a_visitor_can_reach_links_to_the_operator_surface() -> None:
-    """The admin routes need a token, so a link to them from a public page is a wall a reader walks
-    into. The operator surface stays reachable by URL for whoever runs the appliance, and unlinked
-    from everything a visitor sees."""
+def test_the_public_pages_never_link_to_the_operator_surface() -> None:
+    """The admin routes need a token beyond loopback, so an unconditional link to them is a wall a
+    reader walks into.
+
+    The question box is the one exception and it is a conditional one, covered by the two tests
+    below: it offers the upload where uploading is possible at all, and stays quiet otherwise.
+    """
     templates = Path(__file__).resolve().parent.parent / "keel" / "web" / "templates"
-    operator_pages = {"admin.html", "admin_request.html"}
+    allowed = {"admin.html", "admin_request.html", "chat.html"}
     offenders = [
         path.name
         for path in sorted(templates.glob("*.html"))
-        if path.name not in operator_pages and '"/admin' in path.read_text(encoding="utf-8")
+        if path.name not in allowed and '"/admin' in path.read_text(encoding="utf-8")
     ]
     assert offenders == [], f"these visitor-facing templates link to /admin: {offenders}"
+
+
+def test_the_question_box_offers_the_upload_only_where_uploading_is_possible() -> None:
+    """On the hosted demo there is no ingest route, so pointing a reader at one would be a dead end.
+    The same panel then names the command line instead."""
+    with _client_with(demo_identity=False) as client:
+        html = client.get("/chat").text
+    from keel.web.app import web_ingest_enabled
+
+    if web_ingest_enabled():
+        assert 'href="/admin#documents"' in html
+    else:
+        assert "/admin" not in html
+        assert "keel ingest" in html
+
+
+def test_the_question_box_names_the_next_steps_for_somebody_who_just_installed_it() -> None:
+    """Whoever cloned Keel arrives wanting to point it at their own work. The panel answers that on
+    the page they land on rather than leaving it to the documentation."""
+    with _client_with(demo_identity=False) as client:
+        html = client.get("/chat").text
+    assert 'id="getting-started"' in html
+    for step in ("Add your documents", "Connect a model", "your own Azure", "who reads what"):
+        assert step in html, step
+    assert "keel setup --profile azure" in html
+    assert "/docs/setup" in html
+
+
+def test_the_hosted_demo_leaves_the_getting_started_panel_out() -> None:
+    """A visitor to the demo is reading, rather than setting anything up."""
+    with _client_with(demo_identity=True) as client:
+        html = client.get("/chat").text
+    assert 'id="getting-started"' not in html
+
+
+def test_the_identity_controls_appear_only_where_they_are_honoured() -> None:
+    """Beyond loopback and away from the demo, identity comes from the reverse proxy and the form is
+    ignored. Offering a user select there would be offering a control that does nothing."""
+    with _client_with(demo_identity=False, host="0.0.0.0") as client:
+        proxied = client.get("/chat").text
+    with _client_with(demo_identity=False, host="127.0.0.1") as client:
+        local = client.get("/chat").text
+    assert 'name="user_id"' not in proxied
+    assert "come from the reverse proxy" in proxied
+    assert 'name="user_id"' in local
 
 
 # ---------------------------------------------------------------------- documentation pages
@@ -478,3 +526,13 @@ def test_an_empty_store_says_so_rather_than_refusing_without_explanation() -> No
     assert "holds no documents yet" in html
     assert "keel ingest --manifest fixtures/corpus.yaml" in html
     assert "/docs/setup" in html
+
+
+def test_the_getting_started_panel_is_open_on_a_first_visit() -> None:
+    """Whoever just installed Keel should read the next steps without hunting for them. It stays
+    open in the markup, so a first visit and a visit with scripting off both show it, and the script
+    folds it away for good once they collapse it once."""
+    with _client_with(demo_identity=False) as client:
+        html = client.get("/chat").text
+    panel = html[html.index('id="getting-started"') : html.index("</summary>")]
+    assert " open" in panel, "the panel should be open before anyone has collapsed it"

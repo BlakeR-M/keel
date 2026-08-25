@@ -48,7 +48,7 @@ and the app uses that instead. Import time touches neither the model nor the sto
 | `GET /chat` | The appliance: question box, user select (`public` [public], `hr-officer` [public, hr]), free extra tags, mode toggle answer or agent, submit. Results render in place. An empty store says so and names the command that fills it, rather than refusing every question without explanation. |
 | `GET /docs` | The documentation index, built from the Markdown files in `docs/`, in the reading order `keel.web.docs.READING_ORDER` names. |
 | `GET /docs/{slug}` | One document, rendered from `docs/{slug}.md`. A slug is lower-case words joined by hyphens, so it can name nothing outside the directory; the resolved path is checked against `docs/` as well, which closes a symlink pointing out. Sibling `.md` links become pages here and anything reaching out of `docs/` becomes a link into the repository on GitHub. |
-| `POST /ask` | Runs the question. Body is a form or JSON `{question, user_id, tags, mode}`. Replies with the HTML result partial when the request carries `X-Keel-Partial: 1` (what `keel.js` sends), JSON when `Accept: application/json`, otherwise the full chat page with the result in place (plain form post, JavaScript off). |
+| `POST /ask` | Runs the question. Body is a form or JSON `{question, user_id, tags, mode}`. Replies with the HTML result partial when the request carries `X-Keel-Partial: 1` (what `keel.js` sends), JSON when `Accept: application/json`, otherwise the whole page with the result in place (plain form post, JavaScript off). |
 | `POST /api/ask` | Same body, always JSON: `{request_id, mode, user, text, refused, citations[], retrieved[], prompt_tokens, output_tokens, latency_ms, data, error}`. |
 | `POST /api/agent` | Same body with mode forced to agent, always JSON: `{request_id, mode, user, text, refused, steps[], refused_tools[], prompt_tokens, output_tokens, latency_ms}`. Each step carries `tool`, `arguments`, `decision`, and either `result` or `queued_id`. |
 | `GET /source/{chunk_id}` | The chunk text with document title, source, heading, page, position and ACL tags. Query `user` and `tags` name the caller; a chunk whose tags share none with the caller's is 403, an unknown id is 404. `Accept: application/json` returns the row as JSON. |
@@ -97,7 +97,7 @@ With the flag on and the host beyond loopback, `trusted_identity` honours the de
 user's fixed tags, and the extra tags field is ignored; a proxy identity with a valid
 `X-Keel-Proxy-Token` still wins, and any other id runs as `public`. The admin guard is unaffected:
 `/admin` still needs `X-Keel-Admin-Token` beyond loopback. **Never set this for a real deployment**:
-it lets anyone on the network claim the `hr` tag. The chat page shows a banner naming the demo when
+it lets anyone on the network claim the `hr` tag. The question box shows a banner naming the demo when
 the flag is on, with an "Ask as both users" button that fires the restricted pay-round question as
 `public` and as `hr-officer` through the same `/ask` path a typed question takes, and renders the
 refusal and the cited answer side by side.
@@ -146,7 +146,7 @@ the refusal threshold, and nothing from `.env`.
 
 ## Design notes
 
-Dark, calm, system font stack, readable at 390 px and 1280 px. The result area on the chat page is
+Dark, calm, system font stack, readable at 390 px and 1280 px. The result area on the question box is
 swapped by `fetch` so the page stays put while the CPU model answers; refusals get an amber left
 border and a short note, agent steps list tool, arguments, decision state and result (or
 `queued for approval #id` with a link to the admin page). The 14-day trend is five inline SVG

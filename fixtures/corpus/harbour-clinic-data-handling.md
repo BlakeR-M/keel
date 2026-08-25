@@ -1,4 +1,4 @@
-# Harbour Clinic — Data Handling Standard (fixture)
+# Harbour Clinic: Data Handling Standard (fixture)
 
 Original fixture document for testing Keel. Harbour Clinic is fictional.
 

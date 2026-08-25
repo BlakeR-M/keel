@@ -235,3 +235,103 @@ def test_no_page_claims_a_number_of_human_reviewers():
         if claim.search(page.read_text(encoding="utf-8"))
     ]
     assert offenders == [], f"unverifiable reviewer headcount on: {offenders}"
+
+
+def tracked_files() -> list[Path]:
+    """Every file git tracks, which is exactly what a reader of the repository receives."""
+    listed = subprocess.run(  # noqa: S603 (fixed argv, no shell)
+        [_git(), "ls-files"], capture_output=True, text=True, cwd=str(REPO_ROOT), timeout=120
+    )
+    return [REPO_ROOT / name for name in listed.stdout.split() if (REPO_ROOT / name).is_file()]
+
+
+def _git() -> str:
+    from shutil import which
+
+    return which("git") or "git"
+
+
+#: Characters that carry no visible mark. A run of them can encode a signature into prose that reads
+#: normally, so a repository whose argument is that its claims are checkable should carry none.
+INVISIBLE = {
+    0x00AD: "SOFT HYPHEN",
+    0x061C: "ARABIC LETTER MARK",
+    0x180E: "MONGOLIAN VOWEL SEPARATOR",
+    0x200B: "ZERO WIDTH SPACE",
+    0x200C: "ZERO WIDTH NON-JOINER",
+    0x200D: "ZERO WIDTH JOINER",
+    0x200E: "LEFT-TO-RIGHT MARK",
+    0x200F: "RIGHT-TO-LEFT MARK",
+    0x2028: "LINE SEPARATOR",
+    0x2029: "PARAGRAPH SEPARATOR",
+    0x202A: "LEFT-TO-RIGHT EMBEDDING",
+    0x202B: "RIGHT-TO-LEFT EMBEDDING",
+    0x202C: "POP DIRECTIONAL FORMATTING",
+    0x202D: "LEFT-TO-RIGHT OVERRIDE",
+    0x202E: "RIGHT-TO-LEFT OVERRIDE",
+    0x2060: "WORD JOINER",
+    0x2066: "LEFT-TO-RIGHT ISOLATE",
+    0x2067: "RIGHT-TO-LEFT ISOLATE",
+    0x2068: "FIRST STRONG ISOLATE",
+    0x2069: "POP DIRECTIONAL ISOLATE",
+    0xFEFF: "ZERO WIDTH NO-BREAK SPACE",
+}
+INVISIBLE.update({code: "VARIATION SELECTOR" for code in range(0xFE00, 0xFE10)})
+INVISIBLE.update({code: "TAG CHARACTER" for code in range(0xE0000, 0xE0080)})
+
+
+def test_no_tracked_file_carries_an_invisible_character():
+    """Zero-width and bidirectional characters read as nothing and can encode a mark into prose.
+
+    Nothing here needs them, so their absence is worth asserting rather than assuming. Tag characters
+    and variation selectors are covered too: both are the usual vehicle for hiding text in plain sight.
+    """
+    offenders = []
+    for path in tracked_files():
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue  # a binary file carries no prose to hide anything in
+        for index, character in enumerate(text):
+            if ord(character) in INVISIBLE:
+                line = text.count("\n", 0, index) + 1
+                offenders.append(f"{path.relative_to(REPO_ROOT).as_posix()}:{line} {INVISIBLE[ord(character)]}")
+    assert offenders == [], f"invisible characters found: {offenders[:10]}"
+
+
+#: Built from its codepoint, so this file, which every check here reads, carries none itself.
+EM_DASH = chr(0x2014)
+
+
+def test_no_tracked_file_carries_an_em_dash():
+    """Em dashes are the loudest punctuation tell in generated prose, so the house style drops them.
+
+    En dashes in number ranges stay welcome; this is about U+2014 alone.
+    """
+    offenders = []
+    for path in tracked_files():
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        if EM_DASH in text:
+            line = text.count("\n", 0, text.index(EM_DASH)) + 1
+            offenders.append(f"{path.relative_to(REPO_ROOT).as_posix()}:{line}")
+    assert offenders == [], f"em dashes found: {offenders}"
+
+
+def test_no_local_assistant_or_editor_configuration_is_published():
+    """A cloned repository should carry the project, not whoever happened to build it.
+
+    Assistant and editor directories are local working state. They are ignored in
+    `.git/info/exclude`, which does the same job without naming anybody's tooling in a file every
+    reader receives.
+    """
+    private = (".claude", "claude.md", ".cursor", ".aider", ".continue", ".windsurf", ".github/copilot")
+    tracked = {path.relative_to(REPO_ROOT).as_posix().lower() for path in tracked_files()}
+    offenders = sorted(
+        name for name in tracked if any(name == p or name.startswith(f"{p}/") for p in private)
+    )
+    assert offenders == [], f"local tooling configuration is tracked: {offenders}"
+    ignore_file = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8").lower()
+    assert "claude" not in ignore_file, ".gitignore names a specific assistant; keep that local"

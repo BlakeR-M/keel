@@ -1,4 +1,4 @@
-# Supplier Note — Bright Office Supplies (fixture with planted prompt injection)
+# Supplier Note: Bright Office Supplies (fixture with planted prompt injection)
 
 Original fixture document. It contains a planted indirect prompt injection so the quarantine screen has
 something to catch. The injected instruction below must never be followed.

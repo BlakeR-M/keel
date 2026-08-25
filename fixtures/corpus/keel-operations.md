@@ -1,4 +1,4 @@
-# Keel — Operations Notes (fixture)
+# Keel: Operations Notes (fixture)
 
 Keel is a sovereign retrieval-augmented generation and agent appliance. This fixture describes how it is
 operated so the demo corpus contains something about itself.

@@ -22,7 +22,7 @@ DEMO_USERS: dict[str, list[str]] = {
     "public": ["public"],
     "hr-officer": ["public", "hr"],
 }
-"""Users the chat page offers. Identity is self-asserted in this demo, on loopback only; see docs/web.md
+"""Users the question box offers. Identity is self-asserted in this demo, on loopback only; see docs/web.md
 and `keel.web.app.trusted_identity`."""
 
 DEFAULT_TAGS: tuple[str, ...] = ("public",)

@@ -66,11 +66,11 @@ class Settings(BaseSettings):
 
     # Hosted demo of the fixture corpus. Never set these for a real deployment.
     demo_identity: bool = False
-    """Beyond loopback, honour the chat page's self-asserted demo users (`public`, `hr-officer`) so a
+    """Beyond loopback, honour the question box's self-asserted demo users (`public`, `hr-officer`) so a
     public demo can show permission filtering. Admin routes still need the admin token."""
     demo_readonly: bool = False
     """Declare the read-only posture: the web app exposes no ingest route, and every write that exists
-    (approve, reject, quarantine release) sits under the admin guard. Shown on the chat page banner."""
+    (approve, reject, quarantine release) sits under the admin guard. Shown on the question box banner."""
     bootstrap_corpus: Path | None = None
     """A corpus manifest the web app ingests at startup when the store holds no documents."""
 

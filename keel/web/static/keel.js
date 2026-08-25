@@ -129,6 +129,20 @@
     }
   }
 
+  /* The getting-started panel remembers being folded away, so an operator who knows the answers
+     stops being told them. Storage blocked or absent leaves it as the markup found it. */
+  var start = document.getElementById("getting-started");
+  if (start) {
+    var START_KEY = "keel-getting-started-open";
+    try {
+      var stored = window.localStorage.getItem(START_KEY);
+      if (stored !== null) { start.open = stored === "1"; }
+    } catch (e) { /* storage blocked */ }
+    start.addEventListener("toggle", function () {
+      try { window.localStorage.setItem(START_KEY, start.open ? "1" : "0"); } catch (e) { /* storage blocked */ }
+    });
+  }
+
   // ------------------------------------------------------------------ 2. permission comparison
 
   /* One click asks the restricted question as both demo users. Each column is a real request through

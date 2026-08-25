@@ -280,7 +280,7 @@ The same engine serves `keel ask` and the eval runner; nothing in the eval path 
 
 ## Request lifecycle: the agent loop
 
-1. `AgentLoop.run(question, user, max_steps=6)` (behind `POST /api/agent`, the chat page in agent
+1. `AgentLoop.run(question, user, max_steps=6)` (behind `POST /api/agent`, the question box in agent
    mode, and `keel agent`) mints a request id, builds a `ToolContext(user, request_id)`, reads the
    registry's `ToolSpec`s and appends a `request` ledger row.
 2. The system prompt lists every tool with its description and marks write tools; the user turn is

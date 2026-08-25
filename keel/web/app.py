@@ -1,4 +1,4 @@
-"""The Keel web app: chat page with citation chips, source viewer with ACL enforcement, admin page
+"""The Keel web app: question box with citation chips, source viewer with ACL enforcement, admin page
 (recent requests, totals, 14-day trend, quarantine, approvals, ledger verify and export) and a health
 probe. `app` is the ASGI entry point (`uvicorn keel.web.app:app`, or `keel serve`).
 
@@ -10,7 +10,7 @@ Nothing at import time touches the model or the store.
 Admin routes are open on loopback. When `settings.host` is any other address they require the
 `X-Keel-Admin-Token` header to equal the `KEEL_ADMIN_TOKEN` environment variable.
 
-Identity follows the same line. On loopback the chat page's user select and tags field are honoured as
+Identity follows the same line. On loopback the question box's user select and tags field are honoured as
 given (the demo of permission filtering). Beyond loopback nothing in a request body or query string can
 name a user or a tag: identity comes only from an authenticating reverse proxy that sends `X-Keel-User`
 and `X-Keel-Tags` together with `X-Keel-Proxy-Token` equal to `KEEL_PROXY_TOKEN`; every other request
@@ -283,7 +283,7 @@ def actor_from(payload: dict[str, Any]) -> str:
 
 
 def error_response(request: Request, status: int, message: str, *, partial_ok: bool = True) -> Response:
-    """One error shape for every route: JSON, an HTML fragment for the chat page, or an error page."""
+    """One error shape for every route: JSON, an HTML fragment for the question box, or an error page."""
     if wants_json(request):
         return JSONResponse({"error": message}, status_code=status)
     if partial_ok and wants_partial(request):
@@ -589,7 +589,12 @@ def corpus_state(ctx: AppContext) -> tuple[int, bool]:
 def chat_page(
     ctx: AppContext, *, form: dict[str, Any] | None = None, result: dict[str, Any] | None = None
 ) -> HTMLResponse:
-    """The question box, with the submitted values kept in the form and any result rendered in place."""
+    """The question box, with the submitted values kept in the form and any result rendered in place.
+
+    `picker` decides whether the identity controls render at all. Beyond loopback and away from the
+    hosted demo, `trusted_identity` takes the user and the tags from the reverse proxy and ignores
+    anything in the form, so offering a select there would be offering a control that does nothing.
+    """
     values = {"question": "", "user_id": "public", "tags": "", "mode": "answer"}
     if form:
         values.update({k: str(v or "") for k, v in form.items() if k in values})
@@ -602,6 +607,8 @@ def chat_page(
         result=result,
         documents=documents,
         fixture_corpus=fixtures,
+        picker=identity_picker(ctx),
+        ingest_enabled=web_ingest_enabled(),
     )
 
 
@@ -642,7 +649,7 @@ def result_context(mode: str, question: str, user: User, outcome: Any) -> dict[s
 
 async def run_question(request: Request, *, force_mode: str | None = None) -> Response:
     """Shared body of /ask, /api/ask and /api/agent: parse, run the engine or the agent off the event
-    loop, and reply as JSON, an HTML partial, or the full chat page with the result in place."""
+    loop, and reply as JSON, an HTML partial, or the whole page with the result in place."""
     ctx = get_ctx(request)
     payload = await read_payload(request)
     question = str(payload.get("question") or "").strip()

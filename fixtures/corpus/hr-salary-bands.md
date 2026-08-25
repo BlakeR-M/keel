@@ -1,4 +1,4 @@
-# Northbank City Council — Salary Bands (RESTRICTED fixture, acl: hr)
+# Northbank City Council: Salary Bands (RESTRICTED fixture, acl: hr)
 
 Original fixture document. Access is limited to users carrying the "hr" tag. Used to test that
 permission filtering happens before generation.

@@ -437,3 +437,19 @@ table.grid td.ref { font-family: var(--mono); font-size: 0.82em; overflow-wrap: 
   .prose table { font-size: 0.82rem; }
   .prose td:first-child { white-space: normal; }
 }
+
+/* Getting started: the panel on the question box that names the next few things an operator does.
+   A details element, so it folds away once they know and needs no JavaScript to work at all. */
+.start { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s3) var(--s4); margin: var(--s4) 0; }
+.start > summary { cursor: pointer; font-weight: 600; color: var(--text); list-style: none; display: flex; align-items: center; gap: var(--s2); }
+.start > summary::-webkit-details-marker { display: none; }
+.start > summary::before { content: "+"; font-family: var(--mono); color: var(--accent); width: 1em; text-align: center; }
+.start[open] > summary::before { content: "\2212"; }
+.start > summary:hover { color: var(--accent-strong); }
+.start > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.start .explain-list { margin-top: var(--s3); }
+.start .proof { margin-top: var(--s3); }
+
+/* The identity controls are absent where a reverse proxy decides them, so the row rebalances. */
+.row.no-picker { grid-template-columns: auto 1fr; }
+@media (max-width: 760px) { .row.no-picker { grid-template-columns: 1fr; } }

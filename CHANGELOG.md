@@ -103,7 +103,7 @@ code-complete for Azure against mocked SDK clients, with evaluation, policy and 
   chunk ids, tool calls, answer, judge scores, latency, tokens) and an admin page with recent requests,
   a fourteen-day trend, the quarantine list with release, the approval queue with approve and reject,
   and ledger verify and export.
-- **Web and CLI**: FastAPI and Jinja chat page with citation chips and the refusal state; `keel`
+- **Web and CLI**: FastAPI and Jinja question box with citation chips and the refusal state; `keel`
   command line with `ingest`, `ask`, `agent`, `approvals` (list, approve, reject), `verify-ledger`,
   `eval`, `export-log`, `status` and `serve`.
 - **On-premise deploy** (`deploy/onprem/`): native `run.ps1` and `run.sh` that start llama-server and

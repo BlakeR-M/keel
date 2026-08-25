@@ -1,4 +1,4 @@
-# Northbank City Council — Procurement Guide (fixture)
+# Northbank City Council: Procurement Guide (fixture)
 
 This is an original fixture document written for testing Keel. It describes a fictional council.
 
