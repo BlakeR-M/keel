@@ -28,6 +28,90 @@ command, and `keel status` reports it as `air-gap: on`.
 
 ## Commands
 
+### `keel up`
+
+The whole first run in one command: find a model server, load the fixture corpus, start the web app
+and open it. Each step is skipped once it has happened, so a second run just starts the server.
+
+```bash
+keel up [--no-open]
+```
+
+This is the command to run after cloning. It lands on the question box rather than the overview,
+because whoever installed Keel came to use it. See [`setup.md`](setup.md) for the pieces separately.
+
+### `keel setup`
+
+Point Keel at a model you already run, or at your own Azure resources, and write it to `.env`.
+
+```bash
+keel setup                                              # search this machine and choose
+keel setup --base-url http://127.0.0.1:11434/v1 --model llama3.1:8b
+keel setup --profile azure --azure-openai-endpoint https://<resource>.openai.azure.com \
+           --azure-search-endpoint https://<search>.search.windows.net \
+           --chat-deployment gpt-4o-mini --embed-deployment text-embedding-3-small
+```
+
+With no options it probes the ports Ollama, LM Studio, llama.cpp and vLLM listen on, since all four
+answer the same OpenAI-compatible `/v1/models`, and reads back the models each one serves. Choosing
+one writes `KEEL_LOCAL_LLM_BASE_URL` and `KEEL_LOCAL_LLM_MODEL`, then loads the fixture corpus when
+the store is empty. `--yes` takes the first server found without asking, `--no-ingest` skips the
+corpus, and `--env-file` writes somewhere other than `.env`. The Azure profile writes no key: the
+deployment runs on a user-assigned managed identity.
+
+Exit 1 when nothing is answering, or when the endpoint named is out of reach.
+
+### `keel doctor`
+
+Check the configuration a first run depends on, and name the fix for anything unready.
+
+```bash
+keel doctor
+```
+
+Reads settings without building the application context, so it still reports when the model endpoint
+or the store is the thing standing in the way. Checks the data directory is writable, the air-gap
+allow list covers the model host, the endpoint answers, the configured model is one that endpoint
+serves, and the store holds documents. Exit 1 when a check wants attention.
+
+```
+profile: local
+   ok  data directory  D:\keel\data is writable
+   ok  air-gap         off, so outbound connections are unrestricted
+check  model endpoint  http://127.0.0.1:8081/v1 is out of reach. ConnectTimeout: timed out
+                       Something is answering elsewhere on this machine: Ollama at
+                       http://127.0.0.1:11434/v1. Run `keel setup` to point at it.
+   ok  corpus          5 document(s) in the store
+```
+
+The same checks appear on a page at `/admin/connection`, for a deployment with no terminal on the box.
+
+### `keel documents`
+
+List what the store holds, change a document's access tags, or take one out.
+
+```bash
+keel documents list [--json]
+keel documents retag <id> --tags hr,finance [--by NAME]
+keel documents remove <id> [--yes] [--by NAME]
+```
+
+`list` prints each document with its access tags, chunk count and quarantine count, newest first,
+and ends with the tags in use across the store.
+
+`retag` replaces a document's tags and its chunks' tags together, inside one transaction. Retrieval
+filters on the chunk, so both have to move or the change would be cosmetic. Tags are the whole
+access-control model: a reader holding any one of them can retrieve the document, and an empty list
+becomes `public` rather than a document nobody can reach.
+
+`remove` takes the document out with its chunks, its full-text entries and its embeddings. It prompts
+first, because it is the one irreversible action here; `--yes` opts out for a script. The ledger row
+is written before the rows go, inside the same transaction, so the audit trail keeps a description of
+what left.
+
+Both write to the ledger and both are available in the browser under Documents on the admin page.
+Exit 1 when the document id is absent.
+
 ### `keel ingest`
 
 Ingest files, URLs or a manifest. Formats: PDF, DOCX, Markdown, HTML and plain text. Every chunk is

@@ -335,3 +335,43 @@ def test_no_local_assistant_or_editor_configuration_is_published():
     assert offenders == [], f"local tooling configuration is tracked: {offenders}"
     ignore_file = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8").lower()
     assert "claude" not in ignore_file, ".gitignore names a specific assistant; keep that local"
+
+
+def test_every_command_the_cli_offers_is_documented():
+    """A command nobody wrote down is a command nobody finds.
+
+    `docs/cli.md` is the reference a reader reaches for, and four commands went undocumented for a
+    day before a staleness scan caught them. This closes that gap by asking typer what exists rather
+    than trusting a list.
+    """
+    from keel.cli import app as cli
+
+    names: set[str] = set()
+    for command in cli.registered_commands:
+        names.add(command.name or (command.callback.__name__ if command.callback else ""))
+    for group in cli.registered_groups:
+        names.add(group.name or "")
+    names = {name.replace("_", "-") for name in names if name}
+    assert names, "typer reported no commands, so this check is not reading what it thinks"
+
+    documented = (REPO_ROOT / "docs" / "cli.md").read_text(encoding="utf-8")
+    missing = sorted(name for name in names if f"keel {name}" not in documented)
+    assert missing == [], f"these commands are absent from docs/cli.md: {missing}"
+
+
+def test_every_route_the_web_app_serves_is_documented():
+    """The same for the web app: `docs/web.md` lists the routes, so a new one belongs there too."""
+    from keel.web.app import app as web
+
+    rows = []
+    for route in web.routes:
+        included = getattr(route, "original_router", None)
+        rows.extend(included.routes if included is not None else [route])
+    paths = {
+        getattr(route, "path", "")
+        for route in rows
+        if getattr(route, "path", "").startswith(("/admin", "/api", "/docs", "/chat", "/about", "/ask"))
+    }
+    documented = (REPO_ROOT / "docs" / "web.md").read_text(encoding="utf-8")
+    missing = sorted(path for path in paths if path and path not in documented)
+    assert missing == [], f"these routes are absent from docs/web.md: {missing}"
