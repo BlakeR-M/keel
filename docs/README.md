@@ -9,6 +9,7 @@ The web app renders every page here at `/docs`, so a reader can stay on the site
 
 | Page | Read it when |
 | --- | --- |
+| [`setup.md`](setup.md) | You are pointing Keel at a model or a cloud account. The four ways to attach one, what Keel downloads for itself, and what `keel doctor` reports when a first run stalls. |
 | [`tutorial.md`](tutorial.md) | You are starting from a fresh clone. Install, load documents, ask a restricted question as two users, run the agent and approve its write, verify the ledger, bring your own documents, serve it, and turn the network off. |
 | [`architecture.md`](architecture.md) | You want the module-by-module walkthrough: the provider contracts, the SQLite data model, the request lifecycle for `/api/ask` and for the agent loop, and the ledger kinds. |
 | [`cli.md`](cli.md) | You are at a shell. Every `keel` command, flag, output shape and exit code: `ingest`, `ask`, `agent`, `approvals`, `verify-ledger`, `status`, `serve`, `eval`, `export-log`. |

@@ -18,7 +18,7 @@
     approve them. Every request appends to a hash-chained ledger that verifies from an exported file.
   </p>
   <ul class="stat-strip">
-    <li><span class="stat-n">604</span><span class="stat-k">tests, 19 files</span></li>
+    <li><span class="stat-n">625</span><span class="stat-k">tests, 20 files</span></li>
     <li><span class="stat-n">105</span><span class="stat-k">attack tests</span></li>
     <li><span class="stat-n">27</span><span class="stat-k">review findings</span></li>
     <li><span class="stat-n">5</span><span class="stat-k">guarded egress layers</span></li>
@@ -422,25 +422,29 @@
 <section class="block" id="practice">
   <h2>Running it yourself</h2>
   <p class="lede">
-    A fresh clone runs the whole appliance against the fixture corpus on one machine, with the model
-    server optional. The full walkthrough, including loading your own documents and reading the
-    ledger, is in <a href="/docs/tutorial">the tutorial</a>.
+    Keel bundles no model and no cloud account. It runs against whatever you already have, so the
+    first step is pointing it at one. <span class="mono">keel setup</span> looks for a chat server
+    already answering on your machine: Ollama, LM Studio, llama.cpp and vLLM all speak the same
+    OpenAI-compatible API, so whichever you run is found and its model list read back to you.
   </p>
   <pre class="code"><code>git clone {{ github }}.git
 cd keel
 python -m venv .venv &amp;&amp; .venv/bin/pip install -e ".[dev]"
 
-keel ingest --manifest fixtures/corpus.yaml          # 5 documents, 27 chunks, 1 quarantined
-keel ask 'What is the confidential review code for the 2026 pay round?' --tags public
-keel ask 'What is the confidential review code for the 2026 pay round?' --tags public,hr
-keel agent "Create a support ticket titled 'Printer down'."
-keel approvals list --status pending
-keel approvals approve 1 --by owner
-keel verify-ledger
-keel serve                                           # the appliance, on 127.0.0.1:8400</code></pre>
+keel setup      # finds your model server, writes .env, loads the fixture corpus
+keel doctor     # confirms the configuration, and names the fix for anything unready
+keel serve      # http://127.0.0.1:8400</code></pre>
+  <p class="lede">
+    To name an endpoint rather than search for one, or to run inside your own Azure subscription on
+    managed identity:
+  </p>
+  <pre class="code"><code>keel setup --base-url http://127.0.0.1:11434/v1 --model llama3.1:8b
+keel setup --profile azure --azure-openai-endpoint https://&lt;resource&gt;.openai.azure.com            --azure-search-endpoint https://&lt;search&gt;.search.windows.net</code></pre>
   <p class="proof">
-    Every command and flag: <a href="/docs/cli">the CLI reference</a>. The web app, its routes and its
-    identity model: <a href="/docs/web">the web documentation</a>.
+    All four ways to attach a model, and what Keel downloads for itself:
+    <a href="/docs/setup">the setup guide</a>. The whole appliance end to end:
+    <a href="/docs/tutorial">the tutorial</a>. Every command and flag:
+    <a href="/docs/cli">the CLI reference</a>.
   </p>
 </section>
 

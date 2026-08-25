@@ -46,6 +46,7 @@ SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 #: The reading order on the index. Files present in `docs/` but absent here follow, sorted by slug,
 #: so a new document appears without an edit to this list.
 READING_ORDER: tuple[str, ...] = (
+    "setup",
     "tutorial",
     "architecture",
     "security-review",
@@ -61,6 +62,7 @@ READING_ORDER: tuple[str, ...] = (
 #: One line per document, shown under its title on the index. A document with no entry shows the
 #: first sentence of its own body instead.
 BLURBS: dict[str, str] = {
+    "setup": "Point Keel at a model you already run, or at your own Azure tenancy. Nothing is bundled.",
     "tutorial": "Install it, load documents, ask a question, run the agent, verify the ledger.",
     "architecture": "Every component, the data flow through a question, and the ledger hash recipe.",
     "security-review": "The pre-publish adversarial review: 105 attack tests, 27 findings, and the test that proves each fix.",

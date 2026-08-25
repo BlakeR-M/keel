@@ -1,4 +1,4 @@
-"""The `keel` command line: ingest, ask, agent, approvals, verify-ledger, status, serve, eval, export-log.
+"""The `keel` command line: setup, doctor, ingest, ask, agent, approvals, verify-ledger, status, serve, eval, export-log.
 
 Importing this module is cheap. Every command builds the application context (`build_context()`)
 inside its own body, so `keel --help` loads nothing heavier than typer. The global `--data-dir` and
@@ -561,6 +561,189 @@ def _ledger_head_seq(ctx: AppContext) -> int:
 
 
 # ---------------------------------------------------------------------- status
+
+
+# ---------------------------------------------------------------------- setup and doctor
+
+
+def _echo_checks(checks: list[Any]) -> int:
+    """Print a preflight result and return the number of checks wanting attention."""
+    width = max(len(c.name) for c in checks)
+    wanting = 0
+    for check in checks:
+        typer.echo(f"{check.mark:>5}  {check.name.ljust(width)}  {check.detail}")
+        if not check.ok:
+            wanting += 1
+            if check.fix:
+                typer.echo(f"{'':>5}  {'':<{width}}  {check.fix}")
+    return wanting
+
+
+@app.command()
+def doctor() -> None:
+    """Check the configuration a first run depends on, and name the fix for anything unready.
+
+    Reads settings without building the application context, so it still reports when the model
+    endpoint or the store is the thing standing in the way. Exit 1 when a check wants attention.
+    """
+    from keel.config import Settings
+    from keel.onboarding import run_checks
+
+    settings = Settings()
+    typer.echo(f"profile: {settings.profile}")
+    checks = run_checks(settings)
+    wanting = _echo_checks(checks)
+    typer.echo("")
+    if wanting:
+        typer.echo(f"{wanting} check(s) want attention. `keel setup` writes most of this for you.")
+        raise typer.Exit(1)
+    typer.echo("Ready. Ask a question with `keel ask`, or start the web app with `keel serve`.")
+
+
+@app.command()
+def setup(
+    base_url: Annotated[
+        str,
+        typer.Option("--base-url", help="OpenAI-compatible chat endpoint, e.g. http://127.0.0.1:11434/v1"),
+    ] = "",
+    model: Annotated[str, typer.Option("--model", help="Model name that endpoint serves.")] = "",
+    api_key: Annotated[
+        str, typer.Option("--api-key", help="Sent as a bearer token. Local servers ignore it.")
+    ] = "",
+    profile: Annotated[
+        str,
+        typer.Option("--profile", help="local (your own model server) or azure (your own tenancy)."),
+    ] = "",
+    azure_openai_endpoint: Annotated[
+        str, typer.Option("--azure-openai-endpoint", help="https://<resource>.openai.azure.com")
+    ] = "",
+    azure_search_endpoint: Annotated[
+        str, typer.Option("--azure-search-endpoint", help="https://<search>.search.windows.net")
+    ] = "",
+    chat_deployment: Annotated[
+        str, typer.Option("--chat-deployment", help="Azure OpenAI chat deployment name.")
+    ] = "",
+    embed_deployment: Annotated[
+        str, typer.Option("--embed-deployment", help="Azure OpenAI embeddings deployment name.")
+    ] = "",
+    ingest_fixtures: Annotated[
+        bool,
+        typer.Option("--ingest/--no-ingest", help="Load the fixture corpus so there is something to ask."),
+    ] = True,
+    yes: Annotated[
+        bool, typer.Option("--yes", "-y", help="Take the first discovered server without asking.")
+    ] = False,
+    env_file: Annotated[Path, typer.Option("--env-file", help="Where to write the settings.")] = Path(".env"),
+) -> None:
+    """Point Keel at a model you already run, or at your own Azure resources, and write it to `.env`.
+
+    With no options this looks for a chat server already answering on this machine. Ollama, LM Studio,
+    llama.cpp and vLLM all speak the same API, so whichever you have is found and its model list read
+    back. Pass `--base-url` and `--model` to skip the search, or `--profile azure` with the endpoints
+    from your own subscription.
+
+    Keel ships no model and no cloud account. This command records which of yours to use.
+    """
+    from keel.onboarding import discover, merge_env, probe_endpoint
+
+    values: dict[str, str] = {}
+    wants_azure = (profile or "").strip().lower() == "azure" or bool(
+        azure_openai_endpoint or azure_search_endpoint
+    )
+
+    if wants_azure:
+        values["KEEL_PROFILE"] = "azure"
+        pairs = (
+            ("KEEL_AZURE_OPENAI_ENDPOINT", azure_openai_endpoint, "Azure OpenAI endpoint"),
+            ("KEEL_AZURE_SEARCH_ENDPOINT", azure_search_endpoint, "Azure AI Search endpoint"),
+            ("KEEL_AZURE_OPENAI_CHAT_DEPLOYMENT", chat_deployment, "chat deployment name"),
+            ("KEEL_AZURE_OPENAI_EMBED_DEPLOYMENT", embed_deployment, "embeddings deployment name"),
+        )
+        for key, given, label in pairs:
+            value = given if (given or yes) else typer.prompt(label, default="")
+            if value:
+                values[key] = value
+        typer.echo("")
+        typer.echo("Azure runs on your own managed identity, so no key is written anywhere.")
+        typer.echo("deploy/azure/deploy.ps1 creates these in your subscription and prints them.")
+    else:
+        values["KEEL_PROFILE"] = "local"
+        if not base_url:
+            typer.echo("Looking for a chat server on this machine...")
+            found = discover()
+            if not found:
+                typer.echo("")
+                typer.echo("Nothing answering yet. Start one of these, then run `keel setup` again:")
+                typer.echo("  Ollama      ollama serve                        https://ollama.com")
+                typer.echo("  LM Studio   enable the local server             https://lmstudio.ai")
+                typer.echo("  llama.cpp   llama-server -m model.gguf --port 8081")
+                typer.echo("")
+                typer.echo("Or name one you already run: keel setup --base-url URL --model NAME")
+                raise typer.Exit(1)
+            for index, server in enumerate(found, start=1):
+                listed = ", ".join(server.models[:4]) or "no models listed"
+                typer.echo(f"  {index}. {server.name} at {server.base_url}{SEPARATOR}{listed}")
+            pick = found[0]
+            if len(found) > 1 and not yes:
+                choice = typer.prompt("Which one", default="1")
+                try:
+                    pick = found[max(1, min(len(found), int(choice))) - 1]
+                except ValueError:
+                    pick = found[0]
+            base_url = pick.base_url
+            if not model:
+                model = pick.first_model
+                if len(pick.models) > 1 and not yes:
+                    model = typer.prompt("Which model", default=pick.first_model)
+        reachable, models, detail = probe_endpoint(base_url, api_key or "local")
+        if not reachable:
+            typer.echo(f"{base_url} is out of reach: {detail}")
+            raise typer.Exit(1)
+        if not model:
+            model = models[0] if models else ""
+        if not model:
+            typer.echo(f"{base_url} lists no models. Name one with --model.")
+            raise typer.Exit(1)
+        if models and model not in models:
+            listed = ", ".join(models[:6])
+            typer.echo(f"Note: {base_url} lists {listed}. Writing {model} as given.")
+        values["KEEL_LOCAL_LLM_BASE_URL"] = base_url
+        values["KEEL_LOCAL_LLM_MODEL"] = model
+        if api_key:
+            values["KEEL_LOCAL_LLM_API_KEY"] = api_key
+
+    merge_env(env_file, values)
+    typer.echo("")
+    typer.echo(f"Wrote {env_file}:")
+    for key, value in sorted(values.items()):
+        typer.echo(f"  {key}={value}")
+
+    if ingest_fixtures:
+        manifest = Path("fixtures/corpus.yaml")
+        if manifest.is_file():
+            typer.echo("")
+            typer.echo("Loading the fixture corpus so there is something to ask...")
+            os.environ.update(values)
+            from keel.ingest import ingest_manifest
+
+            with _context() as ctx:
+                already = int(ctx.conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0])
+                if already:
+                    typer.echo(f"  {already} document(s) already in the store, leaving them alone.")
+                else:
+                    results = ingest_manifest(
+                        ctx.conn,
+                        ctx.settings,
+                        ctx.embedder,
+                        ctx.index,
+                        manifest,
+                        screen=ctx.screen,
+                        ledger=ctx.ledger,
+                    )
+                    _report_ingest(results)
+
+    typer.echo("")
+    typer.echo("Next: `keel doctor` to confirm, then `keel serve` and open http://127.0.0.1:8400")
 
 
 @app.command()

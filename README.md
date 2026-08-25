@@ -43,7 +43,7 @@ without a model server or a network connection; the integration tests in
 | Evaluation with a regression gate: a golden set runs through the production answer path, scores retrieval, refusals, leak strings and judged quality, writes HTML and JSON reports, and fails when a gated metric drops past its threshold | [`keel/evals/run.py`](keel/evals/run.py), [`keel/evals/metrics.py`](keel/evals/metrics.py), [`keel/evals/judge.py`](keel/evals/judge.py), [`keel/evals/report.py`](keel/evals/report.py) | [`tests/test_evals.py`](tests/test_evals.py)`::test_broken_retriever_zeroes_hit_at_3_refuses_everything_and_fails_the_gate`, `::test_must_not_include_catches_a_planted_override_string` |
 | Cloud profile without keys: `DefaultAzureCredential` and a user-assigned managed identity; the Bicep template disables local key auth on Azure OpenAI and Azure AI Search | [`keel/providers/azure.py`](keel/providers/azure.py), [`deploy/azure/main.bicep`](deploy/azure/main.bicep) | [`tests/test_azure_provider.py`](tests/test_azure_provider.py)`::TestCredentials::test_chat_uses_default_azure_credential_when_no_client_is_injected`, `::TestAzureSearchIndex::test_search_builds_acl_filter_and_maps_hits`; CI `bicep build` and `bicep lint` |
 
-The full suite is 604 tests across 19 files (`.venv\Scripts\python.exe -m pytest --collect-only -q`),
+The full suite is 625 tests across 20 files (`.venv\Scripts\python.exe -m pytest --collect-only -q`),
 of which 174 are adversarial cases from the 105 attack tests in `tests/redteam_*.py` (below). CI runs the unit and contract tests
 with `-m "not integration"`, ruff, `bicep build` and `bicep lint`, and the eval harness against fakes
 ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
@@ -71,37 +71,38 @@ loopback (now a proxy-asserted identity channel), a stacked-power calculator cal
 core, injections placed in headings and titles that the chunk screen did not see, and DNS lookups that
 escaped the air-gap guard.
 
-## Sixty-second demo
+## Getting it running
 
-Prerequisites: Python 3.11 or newer, a llama.cpp `llama-server` binary and a GGUF model
-(defaults: `D:\llama.cpp\bin\llama-server.exe` and `D:\models\qwen2.5-3b-instruct-q4_k_m.gguf` on
-Windows, `llama-server` on PATH and `./models/qwen2.5-3b-instruct-q4_k_m.gguf` elsewhere; both are
-environment variables, see [`docs/onprem.md`](docs/onprem.md)). The fastembed embedding and reranking
-models download into the local cache on first use.
-
-Windows, from a fresh clone (creates `.venv`, installs, starts llama-server, ingests the fixture
-corpus, starts the web app, prints the URL):
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\demo.ps1     # add -Airgap to run with KEEL_AIRGAP=1
-```
-
-(A stock Windows shell blocks unsigned scripts, so pass `-ExecutionPolicy Bypass` or run
-`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once. Run it from an interactive console; the
-web app it starts stays up after the script returns.)
-
-Linux, macOS or Git Bash:
+Keel bundles no model and no cloud account. It runs against whatever you already have, so the first
+step is pointing it at one. `keel setup` looks for a chat server already answering on this machine:
+Ollama, LM Studio, llama.cpp and vLLM all speak the same OpenAI-compatible API, so whichever you run
+is found and its model list read back to you.
 
 ```bash
-make demo             # make down stops it
+git clone https://github.com/BlakeR-M/keel.git
+cd keel
+python -m venv .venv && .venv/bin/pip install -e ".[dev]"   # .venv\Scripts\pip on Windows
+
+keel setup      # finds your model server, writes .env, loads the fixture corpus
+keel doctor     # confirms the configuration, and names the fix for anything unready
+keel serve      # http://127.0.0.1:8400
 ```
 
-The manual path, which is what the scripts do step by step (`keel` is installed into the venv by
-`pip install -e .[dev]`; activate it with `.venv\Scripts\Activate.ps1`, or call
-`.venv\Scripts\python.exe -m keel.cli` for the same commands without activating):
+To name an endpoint instead of searching for one, or to run inside your own Azure subscription:
 
-```powershell
-.\deploy\onprem\run.ps1 -SkipWeb                       # llama-server on 127.0.0.1:8081
+```bash
+keel setup --base-url http://127.0.0.1:11434/v1 --model llama3.1:8b
+keel setup --profile azure --azure-openai-endpoint https://<resource>.openai.azure.com \
+           --azure-search-endpoint https://<search>.search.windows.net
+```
+
+[`docs/setup.md`](docs/setup.md) covers all four ways to attach a model, what Keel downloads for
+itself (the embedding and reranking models, about 150 MB, once), and the trade you make by choosing a
+hosted endpoint over one of your own.
+
+The whole appliance from the command line:
+
+```bash
 keel ingest --manifest fixtures/corpus.yaml           # 5 documents, 27 chunks, 1 quarantined
 keel ask 'How many written quotes does a $20,000 purchase need at Northbank Council?'
 keel ask 'What is the confidential review code for the 2026 pay round?' --tags public      # refused
@@ -113,11 +114,23 @@ keel verify-ledger
 keel serve                                            # then open http://127.0.0.1:8400
 ```
 
-`keel status` prints the profile, data directory, air-gap state, model health and the store counts;
-`keel eval --report reports --promote` runs the golden set and saves the baseline; `keel export-log`
-prints the inference log as JSON lines. Every command and flag is documented in
-[`docs/cli.md`](docs/cli.md), and [`docs/demo-script.md`](docs/demo-script.md) is a ninety-second
-screen-recording script over the same path.
+Retrieval, entitlement filtering, injection screening, the ledger and the approval queue all work
+with no model attached at all. A refusal costs zero model calls, so it answers instantly either way.
+
+### Docker, or the scripted path
+
+`deploy/onprem/docker-compose.yml` runs a llama.cpp server and Keel side by side, with the app under
+`KEEL_AIRGAP=1` so the only host it can reach is the model container. Put a GGUF at
+`deploy/onprem/models/model.gguf` first, then:
+
+```bash
+docker compose -f deploy/onprem/docker-compose.yml up -d --build
+docker compose -f deploy/onprem/docker-compose.yml exec keel keel ingest --manifest fixtures/corpus.yaml
+```
+
+With llama.cpp binaries and a GGUF already on disk, [`demo.ps1`](demo.ps1) on Windows and `make demo`
+elsewhere do the whole sequence in one command, including starting the model server. Both read
+`KEEL_LLAMA_SERVER` and `KEEL_MODEL_PATH` for the locations; see [`docs/onprem.md`](docs/onprem.md).
 
 ## Architecture
 
@@ -285,7 +298,7 @@ it from a fresh shell.
 | [`keel/evals/`](keel/evals/run.py) | Golden set, judge, metrics, runner, HTML report |
 | [`keel/web/`](keel/web/app.py) | FastAPI app, view helpers, Jinja templates, one stylesheet and one script |
 | [`keel/cli.py`](keel/cli.py) | The `keel` command line (`python -m keel` runs the same app) |
-| [`tests/`](tests/conftest.py) | 604 tests including the three `redteam_*.py` files; [`tests/fakes.py`](tests/fakes.py) holds the `FakeLLM` the unit tests use |
+| [`tests/`](tests/conftest.py) | 625 tests including the three `redteam_*.py` files; [`tests/fakes.py`](tests/fakes.py) holds the `FakeLLM` the unit tests use |
 | [`fixtures/`](fixtures/corpus.yaml) | The original fixture corpus (`corpus/`, `corpus.yaml`) and the golden set ([`golden.yaml`](fixtures/golden.yaml)) |
 | [`scripts/`](scripts/fetch_demo_corpus.py) | `fetch_demo_corpus.py`, an optional CC BY 4.0 public corpus fetcher for a larger demo set |
 | [`deploy/onprem/`](deploy/onprem/run.ps1), [`deploy/azure/`](deploy/azure/README.md), [`deploy/aws/`](deploy/aws/README.md) | Native runners and Compose stack; Bicep, parameters and `deploy.ps1`; the AWS stub README |

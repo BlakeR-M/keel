@@ -11,10 +11,13 @@ want generated answers rather than retrieval alone.
 ## Before you start
 
 - Python 3.11 or newer.
-- About 500 MB of disk for the two embedding models, which download once and then read from cache.
-- A model server if you want generated answers. Any OpenAI-compatible endpoint works, and
-  [`deploy/onprem/`](../deploy/onprem/run.sh) starts a llama.cpp server for you. Retrieval, permission
-  filtering, screening, the ledger and the approval queue all work with no model at all.
+- About 150 MB of disk for the embedding and reranking models, which download once and then read
+  from cache. That is the only thing Keel fetches for itself.
+- A model server if you want generated answers. Keel bundles none, so bring your own: Ollama, LM
+  Studio, llama.cpp, vLLM, a hosted OpenAI-compatible endpoint, or your own Azure tenancy.
+  [`keel setup`](setup.md) finds one already running on your machine and writes the configuration.
+  Retrieval, entitlement filtering, screening, the ledger and the approval queue all work with no
+  model at all.
 
 ## 1. Install
 
