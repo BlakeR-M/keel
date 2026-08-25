@@ -57,6 +57,7 @@ from keel.web.views import (
     chips_for,
     demo_user,
     is_loopback,
+    parse_tags,
     proxy_user,
     resolve_user,
     source_url,
@@ -390,6 +391,19 @@ def approvals_for(ctx: AppContext, request_id: str) -> list[dict[str, Any]]:
     return [row for row in ctx.approvals.list() if row.get("request_id") == request_id]
 
 
+def upload_context() -> dict[str, Any]:
+    """What the admin page needs to offer an upload, or to leave the section out entirely."""
+    if not web_ingest_enabled():
+        return {"ingest_enabled": False, "upload_limits": "", "upload_accept": ""}
+    from keel.web.uploads import ALLOWED_SUFFIXES, describe_limits
+
+    return {
+        "ingest_enabled": True,
+        "upload_limits": describe_limits(),
+        "upload_accept": ",".join(sorted(ALLOWED_SUFFIXES)),
+    }
+
+
 def admin_context(
     ctx: AppContext,
     *,
@@ -428,6 +442,7 @@ def admin_context(
             "min_relevance": ctx.settings.min_relevance,
             "guarded": not is_loopback(ctx.settings.host),
         },
+        **upload_context(),
     }
 
 
@@ -960,6 +975,92 @@ def export_ledger(request: Request) -> StreamingResponse:
     ctx = get_ctx(request)
     headers = {"Content-Disposition": 'attachment; filename="keel-ledger.jsonl"'}
     return StreamingResponse(_ledger_lines(ctx), media_type="application/x-ndjson", headers=headers)
+
+
+# ---------------------------------------------------------------------- ingest from the browser
+#
+# This route exists only where the deployment permits writes. `KEEL_DEMO_READONLY=1` leaves it
+# unregistered rather than registered-and-refusing, so the hosted demo of the fixture corpus has no
+# ingest path at all and a reader can confirm that from the route table rather than from a promise.
+
+
+def web_ingest_enabled() -> bool:
+    """True when this deployment registers the browser ingest route.
+
+    Read once at import, because the answer decides the shape of the application rather than the
+    outcome of a request. `keel.config.Settings` reads the environment and the `.env` beside it and
+    touches neither the model nor the store, which keeps import cheap.
+    """
+    from keel.config import Settings
+
+    return not Settings().demo_readonly
+
+
+if web_ingest_enabled():
+
+    @admin.post("/ingest")
+    async def admin_ingest(request: Request) -> Response:
+        """Take a document from the browser and put it through the ordinary ingest pipeline.
+
+        Behind the admin guard, so beyond loopback it needs the admin token like every other write.
+        The file is checked and staged by `keel.web.uploads` before anything touches the store, then
+        ingested by the same `ingest_path` the command line calls: the same chunking, the same
+        injection screen, the same ledger row. Tags are the access-control model, so they are taken
+        from the form rather than guessed at, and an upload with none is `public`.
+        """
+        import shutil
+        import tempfile
+
+        from keel.ingest import ingest_path
+        from keel.web.uploads import UploadRejected, describe_limits, stage_upload
+
+        form = await request.form()
+        upload = form.get("file")
+        if upload is None or not hasattr(upload, "filename"):
+            return error_response(request, 400, "Choose a file to ingest.", partial_ok=False)
+
+        tags = parse_tags(form.get("tags")) or ["public"]
+        title = str(form.get("title") or "").strip() or None
+        actor = str(form.get("by") or "").strip() or DEFAULT_ACTOR
+
+        staging = Path(tempfile.mkdtemp(prefix="keel-upload-"))
+        try:
+            try:
+                staged = await run_in_threadpool(stage_upload, upload.file, upload.filename, staging)
+            except UploadRejected as rejected:
+                return error_response(request, 400, str(rejected), partial_ok=False)
+
+            ctx = get_ctx(request)
+            try:
+                result = await run_in_threadpool(
+                    ingest_path,
+                    ctx.conn,
+                    ctx.settings,
+                    ctx.embedder,
+                    ctx.index,
+                    staged.path,
+                    title=title,
+                    acl_tags=tags,
+                    screen=ctx.screen,
+                    ledger=ctx.ledger,
+                    meta={"uploaded_by": actor, "original_name": staged.name, "bytes": staged.size},
+                )
+            except Exception as error:  # noqa: BLE001 (a bad document is the sender's problem to read)
+                log.warning("upload of %s could not be ingested: %s", staged.name, error)
+                return error_response(
+                    request,
+                    400,
+                    f"{staged.name} could not be read as a document. Keel reads {describe_limits()}.",
+                    partial_ok=False,
+                )
+        finally:
+            shutil.rmtree(staging, ignore_errors=True)
+
+        body = result.to_dict()
+        body["uploaded_name"] = staged.name
+        if wants_json(request):
+            return JSONResponse(body)
+        return redirect_admin("#documents")
 
 
 app.include_router(admin)

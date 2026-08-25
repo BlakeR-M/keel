@@ -136,6 +136,43 @@
   {% endif %}
 </section>
 
+{% if ingest_enabled %}
+<section id="documents" class="block">
+  <h2>Documents</h2>
+  <p class="hint">
+    Add a document to the store. It goes through the same pipeline the command line uses: section-aware
+    chunking, the injection screen, and a ledger row inside the same transaction. Keel reads
+    {{ upload_limits }}.
+  </p>
+  <form method="post" action="/admin/ingest" enctype="multipart/form-data" class="ask">
+    <div class="row upload-row">
+      <label class="field">
+        <span class="label">File</span>
+        <input type="file" name="file" required accept="{{ upload_accept }}">
+      </label>
+      <label class="field">
+        <span class="label">Access tags <small>(comma separated)</small></span>
+        <input type="text" name="tags" placeholder="public" value="">
+      </label>
+      <label class="field">
+        <span class="label">Title <small>(the document's own otherwise)</small></span>
+        <input type="text" name="title" placeholder="">
+      </label>
+      <div class="field submit">
+        <button type="submit" class="primary">Ingest</button>
+      </div>
+    </div>
+    <input type="hidden" name="by" value="admin">
+  </form>
+  <p class="hint">
+    Tags decide who can retrieve this document, so choose them the way you would choose a folder's
+    permissions. A reader holding any one of them can reach it, and a document tagged
+    <code>public</code> is readable by everyone. Leave the field empty and it becomes
+    <code>public</code>.
+  </p>
+</section>
+{% endif %}
+
 <section id="quarantine" class="block">
   <h2>Quarantine</h2>
   {% if quarantine %}

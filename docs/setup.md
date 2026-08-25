@@ -165,6 +165,30 @@ docker compose -f deploy/onprem/docker-compose.yml exec keel keel ingest --manif
 Swap in `docker-compose.gpu.yml` for CUDA offload. [`docs/onprem.md`](onprem.md) covers the model
 swap, sizing, backups and the network-level air-gap proof with `docker run --network none`.
 
+## Adding your own documents
+
+Two ways, and they run the same pipeline.
+
+From the command line, covered in [the tutorial](tutorial.md):
+
+```bash
+keel ingest ./handbook.pdf --tags public
+keel ingest --manifest your-corpus.yaml
+```
+
+Or from the admin page, under **Documents**. Choose a file, name the access tags, and it goes through
+section-aware chunking, the injection screen and a ledger row exactly as a command-line ingest does.
+Keel reads PDF, DOCX, Markdown, HTML and plain text, up to 25 MB.
+
+Tags are the whole access-control model, so the form asks for them rather than guessing. A reader
+holding any one of a document's tags can retrieve it, an empty field means `public`, and the filter
+applies from the moment the upload finishes: a document tagged `finance` is invisible to everyone
+without that tag, in retrieval, in citations and in the source viewer alike.
+
+The upload route lives behind the admin guard, so beyond loopback it needs `KEEL_ADMIN_TOKEN` like
+every other write. A deployment that sets `KEEL_DEMO_READONLY=1` has no upload route at all: it is
+left unregistered rather than registered and refusing, which is how the hosted demo runs.
+
 ## When a first run stalls
 
 ```bash

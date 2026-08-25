@@ -9,6 +9,7 @@ data directory. No network, no llama-server.
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -630,20 +631,20 @@ def test_demo_identity_ignores_extra_tags_and_unknown_users(
         web_ctx.settings.demo_identity = original_flag
 
 
-def test_web_app_exposes_no_ingest_route_and_every_write_sits_under_admin() -> None:
-    """The read-only demo posture: nothing on the web ingests, and approve, reject and quarantine
-    release are admin routes (token beyond loopback).
+def test_every_write_route_sits_under_the_admin_guard() -> None:
+    """Nothing writes without passing `require_admin`, and the set stays closed.
 
     `/api/airgap-probe` and `/api/redact` are POST routes that change nothing: the first runs the
     egress guard in a child process and the second is a pure function of its argument. They are
-    listed here so the set stays closed and a genuinely new write cannot be added unnoticed."""
+    listed so a genuinely new write cannot be added unnoticed. `/admin/ingest` is a real write and
+    sits where writes go.
+    """
     routes = []
     for route in app.routes:
         included = getattr(route, "original_router", None)
         routes.extend(included.routes if included is not None else [route])
     paths = {getattr(route, "path", "") for route in routes}
     assert paths >= {"/", "/ask", "/admin"}
-    assert not any("ingest" in path for path in paths)
     writers = [
         path
         for route in routes
@@ -656,8 +657,42 @@ def test_web_app_exposes_no_ingest_route_and_every_write_sits_under_admin() -> N
         "/api/agent",
         "/api/airgap-probe",
         "/api/redact",
+        "/admin/ingest",
         "/admin/approvals/{approval_id}/approve",
         "/admin/approvals/{approval_id}/reject",
         "/admin/quarantine/{chunk_id}/release",
         "/admin/ledger/verify",
     }
+    assert all(path.startswith("/admin") for path in writers if "ingest" in path), (
+        "ingest changes the store, so it belongs behind the admin guard"
+    )
+
+
+def test_the_read_only_posture_leaves_the_ingest_route_unregistered() -> None:
+    """`KEEL_DEMO_READONLY=1` removes the browser ingest route rather than leaving it to refuse.
+
+    The hosted demo of the fixture corpus runs with that flag, so a reader confirms the posture from
+    the route table instead of taking a promise for it. Checked in a child process, because the
+    answer is decided once, when the application module is imported.
+    """
+    import subprocess
+    import sys
+
+    snippet = (
+        "from keel.web.app import app, web_ingest_enabled;"
+        "rows=[];"
+        "[rows.extend(getattr(r,'original_router').routes if getattr(r,'original_router',None) "
+        "else [r]) for r in app.routes];"
+        "print(web_ingest_enabled(), "
+        "[getattr(r,'path','') for r in rows if 'ingest' in getattr(r,'path','')])"
+    )
+    completed = subprocess.run(  # noqa: S603 (fixed argv, no shell)
+        [sys.executable, "-c", snippet],
+        capture_output=True,
+        text=True,
+        cwd=str(Path(__file__).resolve().parent.parent),
+        env={**os.environ, "KEEL_DEMO_READONLY": "1"},
+        timeout=180,
+    )
+    assert completed.returncode == 0, completed.stderr[-2000:]
+    assert completed.stdout.strip() == "False []", completed.stdout
