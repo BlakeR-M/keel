@@ -30,6 +30,7 @@ DEFAULT_USER = "cli"
 DEFAULT_TAGS = "public"
 SEPARATOR = " · "  # middle dot with spaces: '[1] title · heading · p.N · source'
 RESULT_CHARS = 72  # width of the result column in the agent step table
+PREVIEW_ROWS = 10  # documents named before a bulk confirmation prompt, ahead of a count for the rest
 
 app = typer.Typer(
     name="keel",
@@ -658,6 +659,35 @@ def documents_remove(
     )
 
 
+@documents_app.command("clear")
+def documents_clear(
+    by: Annotated[str, typer.Option("--by", help="Who is making the change, for the ledger.")] = "",
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Clear without the confirmation prompt.")] = False,
+) -> None:
+    """Take every document out of the store, leaving it empty.
+
+    The command for the point where the fixture corpus has served its purpose and the store should
+    hold your own documents instead. Each removal is recorded in the ledger on its own, so the audit
+    trail still describes what left. A store that is already empty exits 0 and changes nothing.
+    """
+    from keel.documents import clear_documents, list_documents
+
+    with _context() as ctx:
+        rows = list_documents(ctx.conn)
+        if not rows:
+            typer.echo("the store holds no documents already")
+            return
+        if not yes:
+            for row in rows[:PREVIEW_ROWS]:
+                typer.echo(f"  {row.title}{SEPARATOR}{row.chunks} chunk(s)")
+            if len(rows) > PREVIEW_ROWS:
+                typer.echo(f"  and {len(rows) - PREVIEW_ROWS} more")
+            typer.confirm(f"Remove all {len(rows)} document(s)", abort=True)
+        removed = clear_documents(ctx.conn, ctx.index, by=by or getpass.getuser(), ledger=ctx.ledger)
+    chunks = sum(row.chunks_removed for row in removed)
+    typer.echo(f"cleared {len(removed)} document(s){SEPARATOR}{chunks} chunk(s)")
+
+
 # ---------------------------------------------------------------------- setup and doctor
 
 
@@ -928,12 +958,16 @@ def up(
     open_browser: Annotated[
         bool, typer.Option("--open/--no-open", help="Open the browser once the server is answering.")
     ] = True,
+    empty: Annotated[
+        bool, typer.Option("--empty", help="Start with no documents, leaving the fixture corpus alone.")
+    ] = False,
 ) -> None:
     """Configure, load and serve in one command: the first thing to run after cloning.
 
     Looks for a model server when none is configured, loads the fixture corpus when the store is
     empty, then starts the web app and opens it. Every step is skipped when it has already happened,
-    so a second run just starts the server.
+    so a second run just starts the server. Pass `--empty` to leave the fixture corpus out and arrive
+    at an empty store ready for your own documents.
     """
     from keel.config import Settings
     from keel.onboarding import discover, merge_env, probe_endpoint
@@ -960,7 +994,7 @@ def up(
             typer.echo("")
 
     manifest = Path("fixtures/corpus.yaml")
-    if manifest.is_file():
+    if manifest.is_file() and not empty:
         from keel.ingest import ingest_manifest
 
         with _context() as ctx:

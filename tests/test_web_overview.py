@@ -120,13 +120,14 @@ def test_the_public_pages_never_link_to_the_operator_surface() -> None:
     """The admin routes need a token beyond loopback, so an unconditional link to them is a wall a
     reader walks into.
 
-    The question box is the one exception and it is a conditional one, covered by the two tests
-    below: it offers the upload where uploading is possible at all, and stays quiet otherwise.
+    Two templates are allowed to link there and both do it conditionally, each covered by its own
+    tests below: the question box offers the upload where uploading is possible at all, and the
+    header carries an Admin item where the console answers without a token.
     """
     templates = Path(__file__).resolve().parent.parent / "keel" / "web" / "templates"
-    # The operator pages link among themselves, which is what they are for. `chat.html` is the one
-    # visitor page allowed to, and only conditionally, covered by the two tests below.
-    allowed = {"admin.html", "admin_request.html", "connection.html", "chat.html"}
+    # The operator pages link among themselves, which is what they are for. `chat.html` and
+    # `base.html` are the visitor-facing pair allowed to, and only behind a condition.
+    allowed = {"admin.html", "admin_request.html", "connection.html", "chat.html", "base.html"}
     offenders = [
         path.name
         for path in sorted(templates.glob("*.html"))
@@ -145,7 +146,9 @@ def test_the_question_box_offers_the_upload_only_where_uploading_is_possible() -
     if web_ingest_enabled():
         assert 'href="/admin#documents"' in html
     else:
-        assert "/admin" not in html
+        # The header may still carry its own Admin item on loopback, so this asks about the panel's
+        # link rather than about the page holding the string anywhere.
+        assert 'href="/admin#documents"' not in html
         assert "keel ingest" in html
 
 
@@ -538,3 +541,31 @@ def test_the_getting_started_panel_is_open_on_a_first_visit() -> None:
         html = client.get("/chat").text
     panel = html[html.index('id="getting-started"') : html.index("</summary>")]
     assert " open" in panel, "the panel should be open before anyone has collapsed it"
+
+
+# ---------------------------------------------------------------------- reaching the documents
+
+
+def test_the_header_offers_the_admin_page_wherever_it_opens() -> None:
+    """Documents live on the admin page, and until now the only route to them was one inline link
+    inside a panel written to fold away for good. An appliance whose whole job is answering from your
+    documents has to keep managing them one click away."""
+    with _client_with(demo_identity=False) as client:
+        html = client.get("/").text
+    assert 'href="/admin"' in html
+    assert "Admin" in html
+
+
+def test_the_header_leaves_the_admin_page_out_beyond_loopback() -> None:
+    """`require_admin` opens the console on loopback and wants a token header no browser sends
+    anywhere else, so a link offered there is a 401 a reader walks into."""
+    with _client_with(demo_identity=False, host="0.0.0.0") as client:
+        html = client.get("/").text
+    assert 'href="/admin"' not in html
+
+
+def test_the_hosted_demo_carries_no_admin_item() -> None:
+    """The published site listens beyond loopback, so its header stays as a visitor finds it."""
+    with _client_with(demo_identity=True, host="0.0.0.0") as client:
+        html = client.get("/").text
+    assert 'href="/admin"' not in html

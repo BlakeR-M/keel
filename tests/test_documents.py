@@ -17,8 +17,9 @@ from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
 from keel.cli import app as cli_app
-from keel.config import Settings
+from keel.config import Settings, reset_settings
 from keel.documents import (
+    clear_documents,
     corpus_tags,
     get_document,
     list_documents,
@@ -39,13 +40,19 @@ QUOTES_QUESTION = "How many written quotes does a $20,000 purchase need?"
 
 
 @pytest.fixture
-def ctx(tmp_path: Path, embedder, reranker) -> Iterator[AppContext]:  # noqa: ANN001
+def ctx(tmp_path: Path, embedder, reranker, monkeypatch: pytest.MonkeyPatch) -> Iterator[AppContext]:  # noqa: ANN001
     """A real store holding the fixture corpus, with a fake model and no network.
 
     Function scoped rather than module scoped: these tests remove documents, and a shared store would
     make each one depend on the order the others ran in.
     """
     settings = Settings(data_dir=tmp_path, airgap=False)
+    # The command-line tests at the foot of this file go through `_context()`, which reads the cached
+    # module-level settings rather than the object built here. Without clearing that cache every
+    # `runner.invoke` in the file acts on whichever store was cached first, and a count asserted after
+    # another test mutated that store comes back wrong.
+    monkeypatch.setenv("KEEL_DATA_DIR", str(tmp_path))
+    reset_settings()
 
     def fake_local_providers(settings_: Settings, conn):  # noqa: ANN001, ANN202
         return FakeLLM(), embedder, SqliteVectorIndex(conn, embed_model=embedder.name), reranker
@@ -66,6 +73,7 @@ def ctx(tmp_path: Path, embedder, reranker) -> Iterator[AppContext]:  # noqa: AN
     )
     yield context
     context.close()
+    reset_settings()
 
 
 @pytest.fixture
@@ -368,3 +376,72 @@ def test_the_command_line_says_so_when_the_document_is_absent(
     result = runner.invoke(cli_app, ["documents", "remove", "9999", "--yes"])
     assert result.exit_code == 1
     assert "9999" in result.output
+
+
+# ---------------------------------------------------------------------- clearing
+
+
+def test_clearing_empties_the_store_and_leaves_nothing_behind(ctx: AppContext) -> None:
+    """The same property removal has, asked of the whole store at once: no documents, no chunks, and
+    no full-text rows pointing at chunks that are gone."""
+    before = list_documents(ctx.conn)
+    assert len(before) > 1, "the fixture corpus should hold several documents for this to mean much"
+
+    removed = clear_documents(ctx.conn, ctx.index, by="tester", ledger=ctx.ledger)
+
+    assert len(removed) == len(before)
+    assert list_documents(ctx.conn) == []
+    assert int(ctx.conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]) == 0
+    assert int(ctx.conn.execute("SELECT COUNT(*) FROM chunks_fts").fetchone()[0]) == 0
+
+
+def test_a_cleared_store_retrieves_nothing_at_all(ctx: AppContext) -> None:
+    """Retrieval is where it matters. A store that reports itself empty while still answering from
+    the chunks it used to hold would be the worst version of this."""
+    assert retrieves(ctx, QUOTES_QUESTION, ["public"]), "the question should reach the corpus first"
+    clear_documents(ctx.conn, ctx.index, ledger=ctx.ledger)
+    assert retrieves(ctx, QUOTES_QUESTION, ["public"]) == set()
+
+
+def test_clearing_records_each_document_separately_and_leaves_the_chain_intact(ctx: AppContext) -> None:
+    """One entry per document rather than one for the clear, so the audit trail says what left."""
+    from keel.safety.ledger import Ledger
+
+    documents = len(list_documents(ctx.conn))
+    before = ctx.ledger.count()
+    clear_documents(ctx.conn, ctx.index, by="tester", ledger=ctx.ledger)
+    assert ctx.ledger.count() == before + documents
+    assert Ledger(ctx.conn).verify().ok
+
+
+def test_clearing_a_store_that_is_already_empty_changes_nothing(ctx: AppContext) -> None:
+    clear_documents(ctx.conn, ctx.index, ledger=ctx.ledger)
+    before = ctx.ledger.count()
+    assert clear_documents(ctx.conn, ctx.index, ledger=ctx.ledger) == []
+    assert ctx.ledger.count() == before, "a clear with nothing to clear should record nothing"
+
+
+def test_the_command_line_clears_only_with_confirmation(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Emptying the store is the largest irreversible action here, so the prompt is the default."""
+    monkeypatch.setenv("KEEL_DATA_DIR", str(ctx.settings.data_dir))
+    declined = runner.invoke(cli_app, ["documents", "clear"], input="n\n")
+    assert declined.exit_code != 0
+    assert list_documents(ctx.conn), "declining should leave every document in place"
+
+    held = len(list_documents(ctx.conn))
+    accepted = runner.invoke(cli_app, ["documents", "clear", "--yes"])
+    assert accepted.exit_code == 0, accepted.output
+    assert f"cleared {held} document(s)" in accepted.output
+    assert list_documents(ctx.conn) == []
+
+
+def test_the_command_line_says_so_when_there_is_nothing_to_clear(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("KEEL_DATA_DIR", str(ctx.settings.data_dir))
+    assert runner.invoke(cli_app, ["documents", "clear", "--yes"]).exit_code == 0
+    again = runner.invoke(cli_app, ["documents", "clear"])
+    assert again.exit_code == 0, again.output
+    assert "no documents already" in again.output

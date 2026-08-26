@@ -16,7 +16,15 @@ keel up
 
 `keel up` does the whole first run: finds a chat server you already have, loads the fixture corpus,
 starts the appliance and opens it. Each step is skipped once it has happened, so running it again
-just starts the server. The pieces separately, when you want to watch each one:
+just starts the server.
+
+The fixture corpus is five invented documents, there so the question box has something to answer and
+so the access-control comparison has a restricted document to withhold. Installing Keel to answer
+from your own work instead? Run `keel up --empty` and arrive at a store holding nothing. Already ran
+it the other way? `keel documents clear` empties the store, and the fixtures stay on disk under
+`fixtures/` for whenever you want them back.
+
+The pieces separately, when you want to watch each one:
 
 ```bash
 keel setup      # finds a chat server you already run and writes .env

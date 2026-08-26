@@ -33,6 +33,11 @@
       {% else %}
       <a href="/"{% if active == 'chat' %} class="on" aria-current="page"{% endif %}>Ask</a>
       {% endif %}
+      {% if admin_open %}
+      {# Documents live on the admin page, and without this the only route to them is one inline link
+         inside a panel that folds away. Absent beyond loopback, where the console answers 401. #}
+      <a href="/admin"{% if active == 'admin' %} class="on" aria-current="page"{% endif %}>Admin</a>
+      {% endif %}
       <a href="/docs"{% if active == 'docs' %} class="on" aria-current="page"{% endif %}>Docs</a>
       <a href="/health"{% if active == 'health' %} class="on" aria-current="page"{% endif %}>Health</a>
       {% if front != 'overview' %}

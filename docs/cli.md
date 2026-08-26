@@ -34,11 +34,18 @@ The whole first run in one command: find a model server, load the fixture corpus
 and open it. Each step is skipped once it has happened, so a second run just starts the server.
 
 ```bash
-keel up [--no-open]
+keel up [--no-open] [--empty]
 ```
 
 This is the command to run after cloning. It lands on the question box rather than the overview,
 because whoever installed Keel came to use it. See [`setup.md`](setup.md) for the pieces separately.
+
+`--empty` skips the fixture corpus and arrives at a store holding nothing, which is what someone
+installing Keel for their own documents wants. Without it the five fixture documents load, so the
+question box has something to answer from and the access-control comparison has a restricted document
+to withhold. Either way the fixtures stay on disk under `fixtures/`, and `keel ingest --manifest
+fixtures/corpus.yaml` loads them later. To go the other way after a first run, `keel documents clear`
+empties a store that already holds them.
 
 ### `keel setup`
 
@@ -94,6 +101,7 @@ List what the store holds, change a document's access tags, or take one out.
 keel documents list [--json]
 keel documents retag <id> --tags hr,finance [--by NAME]
 keel documents remove <id> [--yes] [--by NAME]
+keel documents clear [--yes] [--by NAME]
 ```
 
 `list` prints each document with its access tags, chunk count and quarantine count, newest first,
@@ -109,8 +117,14 @@ first, because it is the one irreversible action here; `--yes` opts out for a sc
 is written before the rows go, inside the same transaction, so the audit trail keeps a description of
 what left.
 
-Both write to the ledger and both are available in the browser under Documents on the admin page.
-Exit 1 when the document id is absent.
+`clear` empties the store, taking each document out through the same path `remove` uses. It names
+the first ten and asks before it starts, and it writes one ledger entry per document, so the audit
+trail describes what left rather than recording a single opaque event. Reach for it when the fixture
+corpus has served its purpose and the store should hold your own documents instead. A store that is
+already empty says so and changes nothing.
+
+Every one of these writes to the ledger, and `list`, `retag` and `remove` are also in the browser
+under Documents on the admin page. Exit 1 when the document id is absent.
 
 ### `keel ingest`
 

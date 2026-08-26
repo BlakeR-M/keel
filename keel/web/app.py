@@ -158,9 +158,11 @@ _env.globals.update({"version": __version__, "demo_users": DEMO_USERS, "github":
 def render(name: str, *, status: int = 200, **context: Any) -> HTMLResponse:
     """Render a template to an HTML response. Every value is escaped unless it is a Markup.
 
-    The footer reads `profile` and `airgap` and the header reads `front`; all three are filled from
-    the app context when the caller did not pass them, so every page shows the same status line and
-    the same navigation.
+    The footer reads `profile` and `airgap`, and the header reads `front` and `admin_open`. All of
+    them are filled from the app context when the caller did not pass them, so every page shows the
+    same status line and the same navigation. `admin_open` follows the same rule `require_admin`
+    enforces: the console is open on loopback, and beyond loopback it wants a token header no browser
+    sends, so the link appears exactly where a visitor can follow it.
     """
     ctx = getattr(app.state, "ctx", None)
     if ctx is not None:
@@ -168,6 +170,7 @@ def render(name: str, *, status: int = 200, **context: Any) -> HTMLResponse:
         context.setdefault("airgap", ctx.settings.airgap)
         context.setdefault("demo", getattr(ctx.settings, "demo_identity", False))
         context.setdefault("front", front_page(ctx))
+        context.setdefault("admin_open", is_loopback(ctx.settings.host))
     return HTMLResponse(_env.get_template(name).render(**context), status_code=status)
 
 

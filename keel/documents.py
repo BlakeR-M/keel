@@ -275,3 +275,29 @@ def remove_document(
         chunks_removed=current.chunks,
         acl_tags=current.acl_tags,
     )
+
+
+def clear_documents(
+    conn: sqlite3.Connection,
+    index: Any,
+    *,
+    by: str = "admin",
+    ledger: Any = None,
+) -> list[RemovalResult]:
+    """Take every document out of the store, leaving it empty.
+
+    Each document goes through `remove_document`, so the cascade, the full-text trigger and the
+    ledger entry behave exactly as they do for a single removal, and a clear reads in the audit trail
+    as the set of removals it is rather than as one opaque event. The loop re-reads the store instead
+    of walking one listing, because `list_documents` caps its rows and a large corpus would otherwise
+    keep a tail. An empty store returns an empty list.
+    """
+    results: list[RemovalResult] = []
+    while True:
+        rows = list_documents(conn)
+        if not rows:
+            break
+        for row in rows:
+            results.append(remove_document(conn, index, row.document_id, by=by, ledger=ledger))
+    log.info("cleared %d document(s)", len(results))
+    return results

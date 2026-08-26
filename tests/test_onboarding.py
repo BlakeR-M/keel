@@ -29,6 +29,7 @@ from keel.onboarding import (
     probe_endpoint,
     run_checks,
 )
+from tests.fakes import FakeLLM
 
 runner = CliRunner()
 
@@ -340,3 +341,63 @@ def test_opening_a_browser_survives_a_machine_with_none(monkeypatch: pytest.Monk
     import time
 
     time.sleep(0.2)  # let the timer thread run and swallow its own failure
+
+
+def test_up_loads_the_fixture_corpus_and_empty_leaves_it_out(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, embedder, reranker  # noqa: ANN001
+) -> None:
+    """Two runs of the same command, so the flag is read against what it changes.
+
+    Whoever clones Keel to look at it wants documents to ask about, and whoever clones it to answer
+    from their own work wants an empty store. The fixtures stay on disk under `fixtures/` either way.
+    """
+    from keel import cli as cli_module
+    from keel import onboarding
+    from keel.config import get_settings, reset_settings
+    from keel.documents import list_documents
+    from keel.providers import factory
+    from keel.providers.local_index import SqliteVectorIndex
+
+    def fake_local_providers(settings_, conn):  # noqa: ANN001, ANN202
+        return FakeLLM(), embedder, SqliteVectorIndex(conn, embed_model=embedder.name), reranker
+
+    monkeypatch.setattr(factory, "_local_providers", fake_local_providers)
+    # No model server to find, so the run neither probes the network nor writes a `.env`.
+    monkeypatch.setattr(onboarding, "probe_endpoint", lambda *a, **k: (True, "", []))
+    monkeypatch.setattr(onboarding, "discover", lambda *a, **k: [])
+    served: list[bool] = []
+    monkeypatch.setattr(cli_module, "_run_server", lambda *a: served.append(True))
+
+    def run(data_dir: Path, *flags: str) -> str:
+        monkeypatch.setenv("KEEL_DATA_DIR", str(data_dir))
+        reset_settings()
+        result = runner.invoke(app, ["up", "--no-open", *flags])
+        assert result.exit_code == 0, result.output
+        return result.output
+
+    def documents(data_dir: Path) -> int:
+        monkeypatch.setenv("KEEL_DATA_DIR", str(data_dir))
+        reset_settings()
+        context = factory.build_context(get_settings())
+        try:
+            return len(list_documents(context.conn))
+        finally:
+            context.close()
+
+    empty_dir = tmp_path / "empty"
+    run(empty_dir, "--empty")
+    assert documents(empty_dir) == 0, "--empty should arrive at a store holding nothing"
+
+    loaded_dir = tmp_path / "loaded"
+    run(loaded_dir)
+    assert documents(loaded_dir) > 0, "the default run should load the fixture corpus"
+
+    assert served == [True, True], "both runs should still start the server"
+    reset_settings()
+
+
+def test_up_keeps_the_fixture_corpus_on_disk_either_way() -> None:
+    """`--empty` is about the store rather than the repository: the fixtures are what the tests and
+    the access-control comparison run against, so they stay where they are."""
+    manifest = Path(__file__).resolve().parent.parent / "fixtures" / "corpus.yaml"
+    assert manifest.is_file()

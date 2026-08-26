@@ -346,11 +346,19 @@ def test_every_command_the_cli_offers_is_documented():
     """
     from keel.cli import app as cli
 
-    names: set[str] = set()
-    for command in cli.registered_commands:
-        names.add(command.name or (command.callback.__name__ if command.callback else ""))
+    def leaf_names(typer_app) -> set[str]:  # noqa: ANN001
+        return {
+            command.name or (command.callback.__name__ if command.callback else "")
+            for command in getattr(typer_app, "registered_commands", [])
+        }
+
+    names = leaf_names(cli)
     for group in cli.registered_groups:
-        names.add(group.name or "")
+        group_name = group.name or ""
+        names.add(group_name)
+        # Subcommands too: `keel documents clear` shipped a day after its siblings and would have
+        # slipped through a check that only asked for the group.
+        names.update(f"{group_name} {leaf}" for leaf in leaf_names(group.typer_instance) if leaf)
     names = {name.replace("_", "-") for name in names if name}
     assert names, "typer reported no commands, so this check is not reading what it thinks"
 
