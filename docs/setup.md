@@ -9,8 +9,12 @@ The short version:
 ```bash
 git clone https://github.com/BlakeR-M/keel.git
 cd keel
-python -m venv .venv && .venv/bin/pip install -e ".[dev]"   # .venv\Scripts\pip on Windows
+python -m venv .venv
 
+source .venv/bin/activate     # macOS and Linux
+.venv\Scriptsctivate        # Windows
+
+pip install -e ".[dev]"
 keel up
 ```
 

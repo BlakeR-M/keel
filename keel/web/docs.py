@@ -27,6 +27,8 @@ import markdown
 __all__ = [
     "DOCS_DIR",
     "GITHUB_BLOB",
+    "AUTHOR_GITHUB",
+    "CONTACT_EMAIL",
     "GITHUB_REPO",
     "Doc",
     "index",
@@ -39,6 +41,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DOCS_DIR = REPO_ROOT / "docs"
 
 GITHUB_REPO = "https://github.com/BlakeR-M/keel"
+# Somebody who reads the page and wants to talk needs an address on it. Both are published already,
+# on flow-through.com.au and as the author of every commit in this repository.
+CONTACT_EMAIL = "service@flow-through.com.au"
+AUTHOR_GITHUB = "https://github.com/BlakeR-M"
 GITHUB_BLOB = f"{GITHUB_REPO}/blob/main"
 
 SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")

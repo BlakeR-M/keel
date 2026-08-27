@@ -152,7 +152,15 @@ _env = Environment(
 _env.filters.update(
     {"thousands": _thousands, "clock": _clock, "short": _short, "pretty": _pretty, "percent": _percent}
 )
-_env.globals.update({"version": __version__, "demo_users": DEMO_USERS, "github": web_docs.GITHUB_REPO})
+_env.globals.update(
+    {
+        "version": __version__,
+        "demo_users": DEMO_USERS,
+        "github": web_docs.GITHUB_REPO,
+        "contact_email": web_docs.CONTACT_EMAIL,
+        "author_github": web_docs.AUTHOR_GITHUB,
+    }
+)
 
 
 def render(name: str, *, status: int = 200, **context: Any) -> HTMLResponse:

@@ -569,3 +569,19 @@ def test_the_hosted_demo_carries_no_admin_item() -> None:
     with _client_with(demo_identity=True, host="0.0.0.0") as client:
         html = client.get("/").text
     assert 'href="/admin"' not in html
+
+
+def test_the_page_gives_a_reader_a_way_to_get_in_touch() -> None:
+    """The page names its author and, for a while, offered no way to reach him. Somebody who reads it
+    and wants to talk should not have to go searching for the name they just read."""
+    with _client_with(demo_identity=True) as client:
+        html = client.get("/").text
+    assert "mailto:" in html, "the overview should carry an address a reader can write to"
+    assert "github.com/BlakeR-M" in html
+
+
+def test_every_page_carries_the_contact_in_its_footer() -> None:
+    """Not only the overview: a reader who arrives on a documentation page should find it there too."""
+    with _client_with(demo_identity=True) as client:
+        for path in ("/chat", "/docs", "/docs/setup"):
+            assert "mailto:" in client.get(path).text, path

@@ -1,7 +1,9 @@
 # Adversarial security review
 
-Before Keel was first published the security-bearing paths were worked over adversarially, attack by
-attack, across access control, tool policy, ledger integrity, injection screening and the air gap.
+Before Keel was first published I attacked its security-bearing paths myself, one attack at a time,
+across access control, tool policy, ledger integrity, injection screening and the air gap. This is a
+self-review rather than an external audit. It is published whole, findings and all, so it can be
+weighed as one.
 Every attack was written as a test that stays in the suite, so the review keeps running rather than
 expiring on the day it finished. This page is the result, with the severity of each finding and the
 test that now proves the fix.

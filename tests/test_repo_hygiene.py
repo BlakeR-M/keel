@@ -383,3 +383,80 @@ def test_every_route_the_web_app_serves_is_documented():
     documented = (REPO_ROOT / "docs" / "web.md").read_text(encoding="utf-8")
     missing = sorted(path for path in paths if path and path not in documented)
     assert missing == [], f"these routes are absent from docs/web.md: {missing}"
+
+
+# ---------------------------------------------------------------------- claims a reader can check
+
+
+def test_the_licence_file_is_the_licence_it_claims():
+    """The README and the overview page both say Apache 2.0. For a while the LICENSE file held only
+    the short boilerplate notice that belongs at the top of a source file, so the terms, the patent
+    grant and the warranty disclaimer were absent and GitHub reported the repository as having no
+    licence at all. A licence nobody can read is a licence nobody can rely on."""
+    licence = (REPO_ROOT / "LICENSE").read_text(encoding="utf-8")
+    for clause in (
+        "TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION",
+        "Grant of Copyright License",
+        "Grant of Patent License",
+        "Disclaimer of Warranty",
+        "END OF TERMS AND CONDITIONS",
+    ):
+        assert clause in licence, f"the licence file is missing: {clause}"
+    assert "Blake Rowlands-Mowle" in licence, "the licence should name its copyright holder"
+
+    for rel in ("README.md", "keel/web/templates/landing.html"):
+        text = (REPO_ROOT / rel).read_text(encoding="utf-8")
+        if "Apache 2.0" in text:
+            assert "Apache License" in licence, f"{rel} claims Apache 2.0 without the licence behind it"
+
+
+def _published_surfaces() -> list[Path]:
+    """The files a reader is told to follow: the README, the guides and the overview page."""
+    files = [REPO_ROOT / "README.md", REPO_ROOT / "keel" / "web" / "templates" / "landing.html"]
+    files.extend(sorted((REPO_ROOT / "docs").glob("*.md")))
+    return files
+
+
+def test_every_install_block_can_be_copied_and_run():
+    """Three published install blocks told a reader to make a virtual environment and then call
+    `keel`, without ever activating it, so the command was absent from PATH on every platform. Two of
+    them also reached for `.venv/bin/pip`, which does not exist on the operating system this is
+    written on."""
+    for path in _published_surfaces():
+        text = path.read_text(encoding="utf-8")
+        if "python -m venv" not in text:
+            continue
+        rel = path.relative_to(REPO_ROOT)
+        assert "venv/bin/pip" not in text, f"{rel} uses a path that is absent on Windows"
+        assert "bin/activate" in text, f"{rel} never activates the environment for macOS or Linux"
+        assert "Scripts" in text and "activate" in text, f"{rel} never activates it for Windows"
+
+
+def test_both_published_attack_numbers_are_true():
+    """The overview page states 105 attack tests and 174 cases in the same section. Both are real,
+    one counting test functions and the other what parametrisation expands them to, and the page now
+    says how they relate. This asserts the pair against what pytest actually collects."""
+    redteam = [node for node in collected_node_ids() if "redteam_" in node.split("::", 1)[0]]
+    cases = len(redteam)
+    functions = len({node.split("[", 1)[0] for node in redteam})
+
+    page = (REPO_ROOT / "keel" / "web" / "templates" / "landing.html").read_text(encoding="utf-8")
+    assert f">{functions}</span><span class=\"stat-k\">attack tests" in page, (
+        f"the overview page should say {functions} attack tests"
+    )
+    assert f">{cases}</span><span class=\"score-k\">cases" in page, (
+        f"the overview page should say {cases} cases"
+    )
+    assert f"{functions} attack tests, which parametrise to {cases} cases" in page, (
+        "the page should say how the two numbers relate, rather than stating both and explaining neither"
+    )
+
+
+def test_the_review_says_who_did_it():
+    """Passive voice where the reviewer's name belongs reads as an external audit that never happened.
+    Naming it as a self-review is both honest and, published in full, the stronger claim."""
+    for rel in ("README.md", "keel/web/templates/landing.html", "docs/security-review.md"):
+        text = (REPO_ROOT / rel).read_text(encoding="utf-8")
+        assert "self-review" in text, f"{rel} should say plainly that the review was its author's own"
+        for evasion in ("were adversarially reviewed", "were worked over adversarially"):
+            assert evasion not in text, f"{rel} still hides who did the review: {evasion}"

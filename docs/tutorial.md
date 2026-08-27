@@ -25,7 +25,11 @@ want generated answers rather than retrieval alone.
 git clone https://github.com/BlakeR-M/keel.git
 cd keel
 python -m venv .venv
-.venv/bin/pip install -e ".[dev]"        # .venv\Scripts\pip on Windows
+
+source .venv/bin/activate     # macOS and Linux
+.venv\Scriptsctivate        # Windows
+
+pip install -e ".[dev]"
 ```
 
 Confirm the appliance can see itself:

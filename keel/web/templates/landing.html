@@ -18,7 +18,7 @@
     approve them. Every request appends to a hash-chained ledger that verifies from an exported file.
   </p>
   <ul class="stat-strip">
-    <li><span class="stat-n">735</span><span class="stat-k">tests, 22 files</span></li>
+    <li><span class="stat-n">741</span><span class="stat-k">tests, 22 files</span></li>
     <li><span class="stat-n">105</span><span class="stat-k">attack tests</span></li>
     <li><span class="stat-n">27</span><span class="stat-k">review findings</span></li>
     <li><span class="stat-n">5</span><span class="stat-k">guarded egress layers</span></li>
@@ -31,7 +31,10 @@
     <a class="button ghost" href="{{ github }}">Source on GitHub</a>
   </div>
   <p class="hero-note">
-    Written by <strong>Blake Rowlands-Mowle</strong>. Apache 2.0, Python 3.11 and up. The three
+    Written by <strong>Blake Rowlands-Mowle</strong>, reachable at
+    <a href="mailto:{{ contact_email }}">{{ contact_email }}</a> and at
+    <a href="{{ author_github }}">{{ author_github|replace('https://', '') }}</a>.
+    Apache 2.0, Python 3.11 and up. The three
     demonstrations below run the production code path against this instance as you read them.{% if picker %}
     The corpus here is five fixture documents holding invented content.{% endif %}
   </p>
@@ -291,18 +294,20 @@
 <section class="block" id="review">
   <h2>The adversarial security review</h2>
   <p class="lede">
-    Before Keel was first published the security-bearing paths were worked over adversarially, attack
-    by attack, across access control, tool policy, ledger integrity, injection screening and the air
-    gap. That produced 105 attack tests and 27 findings. Twenty-five are fixed in the same release,
-    each with the test that proves it. Two stay open by choice, each carrying the control that covers
-    it. Every attack was written as a test that stays in the default suite, so the review keeps
-    running rather than expiring on the day it finished.
+    Before Keel was first published I attacked its security-bearing paths myself, one attack at a
+    time, across access control, tool policy, ledger integrity, injection screening and the air gap.
+    This is a self-review rather than an external audit, and it is published whole so you can weigh
+    it as one. It produced 105 attack tests, which parametrise to 174 cases in the suite, and 27
+    findings. Twenty-five are fixed in the same release, each with the test that proves it. Two stay
+    open by choice, each carrying the control that covers it. Every attack was written as a test that
+    stays in the default suite, so the review keeps running rather than expiring on the day it
+    finished.
   </p>
   <ul class="scoreboard">
     <li><span class="score-n">27</span><span class="score-k">findings</span></li>
     <li><span class="score-n">25</span><span class="score-k">fixed, each with the test that proves it</span></li>
     <li><span class="score-n">2</span><span class="score-k">open by choice, one medium and one low</span></li>
-    <li><span class="score-n">174</span><span class="score-k">adversarial cases in the suite</span></li>
+    <li><span class="score-n">174</span><span class="score-k">cases, from those 105 tests</span></li>
   </ul>
   <div class="explain">
     <h3>The two that stay open</h3>
@@ -423,15 +428,27 @@
   <h2>Running it yourself</h2>
   <p class="lede">
     Keel bundles no model and no cloud account. It runs against whatever you already have, so the
-    first step is pointing it at one. <span class="mono">keel setup</span> looks for a chat server
+    first step is pointing it at one. <span class="mono">keel up</span> looks for a chat server
     already answering on your machine: Ollama, LM Studio, llama.cpp and vLLM all speak the same
-    OpenAI-compatible API, so whichever you run is found and its model list read back to you.
+    OpenAI-compatible API, so whichever you run is found and its model list read back to you. With
+    nothing answering yet it says so and serves anyway, since retrieval and the security controls
+    work without a model.
   </p>
   <pre class="code"><code>git clone {{ github }}.git
 cd keel
-python -m venv .venv &amp;&amp; .venv/bin/pip install -e ".[dev]"
+python -m venv .venv
 
-keel setup      # finds your model server, writes .env, loads the fixture corpus
+source .venv/bin/activate     # macOS and Linux
+.venv\Scripts\activate        # Windows
+
+pip install -e ".[dev]"
+keel up</code></pre>
+  <p class="lede">
+    One command, and the browser opens on the question box. Add
+    <span class="mono">--empty</span> to skip the fixture corpus and start with a store holding only
+    what you put in it. The same run, step by step:
+  </p>
+  <pre class="code"><code>keel setup      # finds your model server and writes .env
 keel doctor     # confirms the configuration, and names the fix for anything unready
 keel serve      # http://127.0.0.1:8400</code></pre>
   <p class="lede">
