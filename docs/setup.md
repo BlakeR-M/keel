@@ -243,6 +243,7 @@ attached at all.
 | `KEEL_LOCAL_LLM_BASE_URL` | `http://127.0.0.1:8081/v1` | The OpenAI-compatible endpoint |
 | `KEEL_LOCAL_LLM_MODEL` | `qwen2.5-3b-instruct` | The model name that endpoint serves |
 | `KEEL_LOCAL_LLM_TIMEOUT` | `120` | Seconds per model call. Raise it on a slow CPU |
+| `KEEL_LOCAL_LLM_WAKE_SECONDS` | `0` | Seconds a call keeps retrying a model host that is still waking from sleep. Set it when the model server sleeps when idle; page loads then start the wake early |
 | `KEEL_DATA_DIR` | `./data` | Where the SQLite store and the ledger live |
 | `KEEL_AIRGAP` | `0` | `1` refuses every outbound connection outside the allow list |
 | `KEEL_AIRGAP_ALLOW_HOSTS` | unset | Extra hosts the guard permits, comma separated |

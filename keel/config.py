@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     local_llm_model: str = "qwen2.5-3b-instruct"
     local_llm_api_key: str = "local"  # llama-server ignores it; the OpenAI client requires a value
     local_llm_timeout: float = 120.0  # seconds per model call; raise it for a slow CPU-only server
+    local_llm_wake_seconds: float = 0.0  # keep retrying a model host that is still waking from sleep
     local_embed_model: str = "BAAI/bge-small-en-v1.5"
     local_rerank_model: str = "Xenova/ms-marco-MiniLM-L-6-v2"
 

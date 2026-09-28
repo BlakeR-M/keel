@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
+import time
 from typing import Any
 
 import openai
@@ -38,6 +40,9 @@ class OpenAICompatibleLLM:
         *,
         client: Any | None = None,
         name: str = "openai-compatible",
+        wake_seconds: float = 0.0,
+        sleep: Any = time.sleep,
+        clock: Any = time.monotonic,
     ) -> None:
         if client is None:
             client = openai.OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
@@ -47,6 +52,12 @@ class OpenAICompatibleLLM:
         self.base_url = base_url
         self.json_schema_fallback = False
         """True once the server rejected `response_format=json_schema` and the prompt carries the schema."""
+        self.wake_seconds = max(0.0, float(wake_seconds))
+        """How long a call keeps retrying a server that is still waking (a host that sleeps when idle)."""
+        self._sleep = sleep
+        self._clock = clock
+        self._last_nudge = float("-inf")
+        self._nudge_lock = threading.Lock()
 
     # ------------------------------------------------------------------ public
 
@@ -75,19 +86,51 @@ class OpenAICompatibleLLM:
                 "json_schema": {"name": "out", "schema": json_schema},
             }
             try:
-                response = self._client.chat.completions.create(**kwargs)
+                response = self._create(**kwargs)
             except (openai.BadRequestError, openai.UnprocessableEntityError) as exc:
                 log.warning("server rejected response_format=json_schema (%s); using prompt fallback", exc)
                 self.json_schema_fallback = True
                 kwargs.pop("response_format")
                 kwargs["messages"] = with_json_instruction(api_messages, json_schema)
-                response = self._client.chat.completions.create(**kwargs)
+                response = self._create(**kwargs)
         else:
             if json_schema is not None:
                 kwargs["messages"] = with_json_instruction(api_messages, json_schema)
-            response = self._client.chat.completions.create(**kwargs)
+            response = self._create(**kwargs)
 
         return parse_response(response, default_model=self.model)
+
+    def nudge(self, every: float = 60.0) -> bool:
+        """Start waking a sleeping model server in the background, at most once per `every` seconds.
+
+        Does nothing unless `wake_seconds` is set. Returns True when a probe was started."""
+        if self.wake_seconds <= 0:
+            return False
+        with self._nudge_lock:
+            now = self._clock()
+            if now - self._last_nudge < every:
+                return False
+            self._last_nudge = now
+        threading.Thread(target=self.healthy, name="keel-llm-nudge", daemon=True).start()
+        return True
+
+    # ----------------------------------------------------------------- private
+
+    def _create(self, **kwargs: Any) -> Any:
+        """One chat completion, retried while the server is unreachable or answering 5xx, for up to
+        `wake_seconds`. A request the server rejects (4xx) is never retried here."""
+        deadline = self._clock() + self.wake_seconds
+        delay = 1.0
+        while True:
+            try:
+                return self._client.chat.completions.create(**kwargs)
+            except (openai.APIConnectionError, openai.InternalServerError) as exc:
+                remaining = deadline - self._clock()
+                if remaining <= 0:
+                    raise
+                log.info("model not ready (%s); retrying for up to %.0fs more", type(exc).__name__, remaining)
+                self._sleep(min(delay, remaining))
+                delay = min(delay * 2, 8.0)
 
     def healthy(self) -> bool:
         """True when GET /models succeeds."""

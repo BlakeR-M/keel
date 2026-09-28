@@ -62,6 +62,7 @@ which Railway mounts root-owned) writable by the unprivileged `keel` user, and d
 | `KEEL_LOCAL_LLM_BASE_URL` | `http://keel-llm.railway.internal:8081/v1` | The model service over the private network |
 | `KEEL_LOCAL_LLM_MODEL` | `qwen2.5-3b-instruct` | Must equal the server's `--alias` |
 | `KEEL_LOCAL_LLM_TIMEOUT` | `300` | Seconds per model call; the CPU server is slow |
+| `KEEL_LOCAL_LLM_WAKE_SECONDS` | `90` | `keel-llm` sleeps when idle (Railway serverless) and takes about 35 seconds to wake. A question waits out the wake instead of failing, and each page load starts the wake early |
 | `KEEL_DEMO_IDENTITY` | `1` | Honour the demo user picker beyond loopback. **Hosted demo of the fixture corpus only; never set for a real deployment** ([docs/web.md](../../docs/web.md)) |
 | `KEEL_DEMO_READONLY` | `1` | Declares the read-only posture: no web ingest route, every write under the admin guard |
 | `KEEL_BOOTSTRAP_CORPUS` | `fixtures/corpus.yaml` | Ingest the fixture manifest at startup when the store is empty |

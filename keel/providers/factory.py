@@ -96,6 +96,7 @@ def _local_providers(settings: Settings, conn: sqlite3.Connection):
         api_key=settings.local_llm_api_key,
         timeout=settings.local_llm_timeout,
         name="llama-server",
+        wake_seconds=settings.local_llm_wake_seconds,
     )
     embedder = FastembedEmbeddings(settings.local_embed_model)
     index = SqliteVectorIndex(conn, embed_model=settings.local_embed_model)

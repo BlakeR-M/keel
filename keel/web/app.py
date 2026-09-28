@@ -339,6 +339,14 @@ def store_counts(ctx: AppContext) -> dict[str, int]:
     }
 
 
+def nudge_llm(ctx: AppContext) -> None:
+    """Start waking a model host that sleeps when idle, so it is ready by the time a visitor asks.
+    Providers without `nudge` (or with no wake window set) are left alone."""
+    nudge = getattr(getattr(ctx, "llm", None), "nudge", None)
+    if callable(nudge):
+        nudge()
+
+
 def llm_healthy(llm: Any, timeout: float = LLM_PROBE_SECONDS) -> bool:
     """`llm.healthy()` with a hard time limit: a probe still running after `timeout` seconds counts as
     unhealthy and is left to finish on its own daemon thread."""
@@ -535,6 +543,7 @@ def overview_page(ctx: AppContext) -> HTMLResponse:
 def root(request: Request) -> HTMLResponse:
     """The front door, which depends on who deployed this. See `front_page`."""
     ctx = get_ctx(request)
+    nudge_llm(ctx)
     if front_page(ctx) == "overview":
         return overview_page(ctx)
     return chat_page(ctx)
@@ -632,7 +641,9 @@ def chat_page(
 @app.head("/chat", response_class=HTMLResponse)
 def chat(request: Request) -> HTMLResponse:
     """The appliance: question box, user select, free tags, answer or agent mode."""
-    return chat_page(get_ctx(request))
+    ctx = get_ctx(request)
+    nudge_llm(ctx)
+    return chat_page(ctx)
 
 
 def result_context(mode: str, question: str, user: User, outcome: Any) -> dict[str, Any]:
