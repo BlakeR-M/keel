@@ -90,6 +90,31 @@ environment variable. Requests without a valid proxy token run as `public`. An u
 curl -H "X-Keel-Proxy-Token: $KEEL_PROXY_TOKEN" -H "X-Keel-User: emma" -H "X-Keel-Tags: public,owner"      -X POST http://host:8400/api/ask -d '{"question": "..."}' -H "Content-Type: application/json"
 ```
 
+### Microsoft Entra ID and Active Directory groups
+
+An organisation already decides who sees what through its directory groups. Keel can follow those
+groups directly, so IT keeps managing access in the place it already does.
+
+The proxy passes the signed-in user's groups in `X-Keel-Groups` (comma-separated: Entra ID group
+object IDs, or group names), and `KEEL_GROUP_TAGS` maps each group to one or more Keel tags:
+
+```bash
+KEEL_GROUP_TAGS='{"6f1c2a9e-3b4d-4e5f-8a7b-0c1d2e3f4a5b": "hr", "Finance Staff": ["finance", "procurement"]}'
+```
+
+- A user carries the tags of every mapped group they belong to, plus anything in `X-Keel-Tags`.
+- A group that is not in the map grants nothing. A new group in the directory opens no documents
+  until someone maps it on purpose.
+- Group matching ignores case. Commas separate groups, so names with spaces work as written.
+- The groups header is honoured only alongside a valid `X-Keel-Proxy-Token`, exactly like the other
+  identity headers.
+
+Any authenticating proxy that can read the user's group claims works. With oauth2-proxy signed in
+against Entra ID and `--set-xauthrequest`, the groups arrive in `X-Auth-Request-Groups`, and an nginx
+`auth_request` front end forwards them to Keel as `X-Keel-Groups`. Entra ID issues group object IDs
+in the token's `groups` claim, so key the map by object ID unless the app registration is set to
+emit names. Tests: [`tests/test_identity_groups.py`](../tests/test_identity_groups.py).
+
 
 ### Hosted demo identity
 

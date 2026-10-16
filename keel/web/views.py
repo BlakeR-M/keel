@@ -83,11 +83,45 @@ def demo_user(user_id: Any) -> User:
     return anonymous_user()
 
 
-def proxy_user(user_id: Any, tags: Any) -> User:
+def parse_groups(raw: Any) -> list[str]:
+    """Directory groups from a comma separated string or a list: trimmed, without repeats. Commas are
+    the only separator, because group names such as `Finance Staff` carry spaces."""
+    items = raw.split(",") if isinstance(raw, str) else raw if isinstance(raw, (list, tuple, set)) else []
+    seen: list[str] = []
+    for item in items:
+        group = str(item).strip()
+        if group and group not in seen:
+            seen.append(group)
+    return seen
+
+
+def group_tags_for(groups: Any, group_map: dict[str, Any] | None) -> list[str]:
+    """The tags a set of directory groups earns under `group_map`, in first-seen order without repeats.
+
+    Groups are matched case-insensitively, since Entra ID object IDs and Active Directory names are
+    both case-insensitive. A group the map does not name contributes nothing: membership alone never
+    becomes a tag, so a new group in the directory grants no access until someone maps it."""
+    lookup = {str(key).strip().casefold(): value for key, value in (group_map or {}).items()}
+    earned: list[str] = []
+    for group in parse_groups(groups):
+        for tag in parse_tags(lookup.get(group.casefold())):
+            if tag not in earned:
+                earned.append(tag)
+    return earned
+
+
+def proxy_user(
+    user_id: Any, tags: Any, groups: Any = None, group_map: dict[str, Any] | None = None
+) -> User:
     """The user an authenticating reverse proxy asserts through its identity headers: the tags exactly
-    as given (the proxy is authoritative, demo users play no part), `public` when it names none."""
+    as given plus the tags its directory groups earn under `group_map` (the proxy is authoritative,
+    demo users play no part), `public` when that adds up to nothing."""
     uid = str(user_id or "").strip() or DEFAULT_USER_ID
-    return User(user_id=uid, tags=parse_tags(tags) or list(DEFAULT_TAGS))
+    combined = parse_tags(tags)
+    for tag in group_tags_for(groups, group_map):
+        if tag not in combined:
+            combined.append(tag)
+    return User(user_id=uid, tags=combined or list(DEFAULT_TAGS))
 
 
 def user_json(user: User) -> dict[str, Any]:

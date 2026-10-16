@@ -13,8 +13,9 @@ Admin routes are open on loopback. When `settings.host` is any other address the
 Identity follows the same line. On loopback the question box's user select and tags field are honoured as
 given (the demo of permission filtering). Beyond loopback nothing in a request body or query string can
 name a user or a tag: identity comes only from an authenticating reverse proxy that sends `X-Keel-User`
-and `X-Keel-Tags` together with `X-Keel-Proxy-Token` equal to `KEEL_PROXY_TOKEN`; every other request
-runs as `public`. See `trusted_identity`.
+with `X-Keel-Tags` and/or `X-Keel-Groups` (directory groups, mapped to tags by `KEEL_GROUP_TAGS`),
+together with `X-Keel-Proxy-Token` equal to `KEEL_PROXY_TOKEN`; every other request runs as `public`.
+See `trusted_identity`.
 """
 
 from __future__ import annotations
@@ -80,6 +81,7 @@ PROXY_TOKEN_ENV = "KEEL_PROXY_TOKEN"
 PROXY_TOKEN_HEADER = "X-Keel-Proxy-Token"
 IDENTITY_USER_HEADER = "X-Keel-User"
 IDENTITY_TAGS_HEADER = "X-Keel-Tags"
+IDENTITY_GROUPS_HEADER = "X-Keel-Groups"
 PARTIAL_HEADER = "X-Keel-Partial"
 LLM_PROBE_SECONDS = 2.0
 RECENT_LIMIT = 50
@@ -269,8 +271,9 @@ def trusted_identity(request: Request, user_id: Any = None, tags: Any = None) ->
 
     On loopback identity is self-asserted, the demo: `user_id` and `tags` (from the body or the query
     string) resolve against the demo users. Beyond loopback the body and query string are ignored,
-    since anyone can write them: identity comes from the reverse proxy through `X-Keel-User` and
-    `X-Keel-Tags`, honoured only when the request also carries `X-Keel-Proxy-Token` equal to
+    since anyone can write them: identity comes from the reverse proxy through `X-Keel-User`,
+    `X-Keel-Tags` and `X-Keel-Groups` (the user's directory groups, which earn tags only through
+    `settings.group_tags`), honoured only when the request also carries `X-Keel-Proxy-Token` equal to
     `KEEL_PROXY_TOKEN` (an unset token means no proxy is trusted). With `KEEL_DEMO_IDENTITY=1` (the
     hosted demo of the fixture corpus, never a real deployment) the demo user picker is honoured
     beyond loopback as well: `user_id` resolves to one of the demo users and its fixed tags, extra tags
@@ -281,7 +284,10 @@ def trusted_identity(request: Request, user_id: Any = None, tags: Any = None) ->
         return resolve_user(user_id, tags)
     if _header_token_matches(request, PROXY_TOKEN_ENV, PROXY_TOKEN_HEADER):
         return proxy_user(
-            request.headers.get(IDENTITY_USER_HEADER), request.headers.get(IDENTITY_TAGS_HEADER)
+            request.headers.get(IDENTITY_USER_HEADER),
+            request.headers.get(IDENTITY_TAGS_HEADER),
+            request.headers.get(IDENTITY_GROUPS_HEADER),
+            getattr(ctx.settings, "group_tags", None),
         )
     if getattr(ctx.settings, "demo_identity", False):
         return demo_user(user_id)

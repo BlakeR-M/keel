@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     """What `/` serves. `auto` reads the deployment: the overview on the hosted demo of the fixture
     corpus, and the question box everywhere else, since anyone who installed Keel came to use it
     rather than to read about it. The overview stays at `/about` either way."""
+    group_tags: dict[str, str | list[str]] = {}
+    """Directory groups to Keel tags, for identity from an authenticating proxy (`KEEL_GROUP_TAGS`, a
+    JSON object). Keys are group object IDs or names from Microsoft Entra ID or Active Directory, and
+    each value is a tag or a list of tags. A user carries the tags of every group they belong to that
+    appears here; a group missing from the map grants nothing, so access stays where IT manages it."""
 
     # Hosted demo of the fixture corpus. Never set these for a real deployment.
     demo_identity: bool = False
